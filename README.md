@@ -63,6 +63,44 @@ ds = xr.open_zarr(
 - Interpretable ML for Weather and Climate Prediction (Survey): https://arxiv.org/pdf/2403.18864
 - XAI4Extremes: https://arxiv.org/html/2503.08163v1
 
+## Ноутбуки
+
+- `01_era5_visualization.ipynb` — визуализация трёх синоптических кейсов (Storm Eunice, волна тепла/блокинг, спокойный день) из ARCO ERA5
+- `02_saliency_experiment.ipynb` — occlusion saliency на Pangu-Weather (global per-variable + spatial patch + сравнение с ground truth). Тяжёлые вычисления считаются `run_case_occlusion.py` параллельно на 3 GPU
+- `03_output_correlation.ipynb` — корреляционная матрица выходов модели (raw/anomaly, модель vs ground truth, локальная пространственная корреляция)
+
+## Совместный доступ (shared filesystem `/srv/exw`)
+
+Тяжёлые артефакты (веса модели, входные данные, результаты прогонов) не лежат в git — они в общей папке `/srv/exw`,
+следуя существующей конвенции команды (`<username>_<project>` для `data/`/`runs/`, без префикса для переиспользуемых
+весов в `checkpoints/`):
+
+- `/srv/exw/checkpoints/pangu_weather_24/pangu_weather_24.onnx` — веса модели (общие, не per-project)
+- `/srv/exw/data/irina_weather_interpretability/` — входные данные (ERA5-срезы по трём кейсам)
+- `/srv/exw/runs/irina_weather_interpretability/` — результаты occlusion-прогонов (`results/*.pkl`)
+
+После `git clone` репозитория собрать симлинки (пути в ноутбуках не меняются):
+
+```bash
+cd weather-interpretability
+mkdir -p model_weights
+ln -s /srv/exw/checkpoints/pangu_weather_24/pangu_weather_24.onnx model_weights/pangu_weather_24.onnx
+ln -s /srv/exw/data/irina_weather_interpretability data
+ln -s /srv/exw/runs/irina_weather_interpretability results
+```
+
+## Workflow: ветки
+
+**В `main` пишет только владелец репозитория.** Остальные — через собственную ветку и Pull Request:
+
+```bash
+git checkout -b <имя>/<фича>
+# ... изменения, коммиты ...
+git push -u origin <имя>/<фича>
+# затем открыть PR в main на GitHub
+```
+
 ## Статус
 
-Проект только начат — README с планом. Следующие шаги TBD.
+Три ноутбука реализованы (визуализация, saliency, корреляция выходов). Известные ограничения задокументированы
+внутри соответствующих ноутбуков (орографический артефакт Z@850hPa, шум local spatial correlation на малых патчах).
