@@ -69,6 +69,25 @@ ds = xr.open_zarr(
 - `02_saliency_experiment.ipynb` — occlusion saliency на Pangu-Weather (global per-variable + spatial patch + сравнение с ground truth). Тяжёлые вычисления считаются `run_case_occlusion.py` параллельно на 3 GPU
 - `03_output_correlation.ipynb` — корреляционная матрица выходов модели (raw/anomaly, модель vs ground truth, локальная пространственная корреляция)
 
+## Окружение
+
+```bash
+python3 -m venv ~/venv
+source ~/venv/bin/activate
+pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu126
+```
+
+**Важно для GPU**: `onnxruntime-gpu` не находит CUDA-библиотеки сам по себе — нужно указать `LD_LIBRARY_PATH` на
+CUDA-либы, которые уже устанавливает `torch` (отдельный system CUDA toolkit не нужен). Добавить в конец
+`~/venv/bin/activate`:
+
+```bash
+export LD_LIBRARY_PATH=$(find "$VIRTUAL_ENV/lib/python3.10/site-packages/nvidia" -maxdepth 2 -type d -name lib 2>/dev/null | paste -sd: -):$LD_LIBRARY_PATH
+```
+
+(env-переменная, установленная уже ПОСЛЕ старта Python-процесса, не подхватывается — это должно быть именно в
+`activate`, а не в коде ноутбука после `import onnxruntime`.)
+
 ## Совместный доступ (shared filesystem `/srv/exw`)
 
 Тяжёлые артефакты (веса модели, входные данные, результаты прогонов) не лежат в git — они в общей папке `/srv/exw`,
