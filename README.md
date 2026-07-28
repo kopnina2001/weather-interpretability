@@ -79,14 +79,13 @@ ds = xr.open_zarr(
 - `/srv/exw/data/irina_weather_interpretability/` — входные данные (ERA5-срезы по трём кейсам)
 - `/srv/exw/runs/irina_weather_interpretability/` — результаты occlusion-прогонов (`results/*.pkl`)
 
-После `git clone` репозитория собрать симлинки (пути в ноутбуках не меняются):
+Симлинки `data` и `results` закоммичены в git (git symlink, mode 120000) — восстанавливаются автоматически при
+`git clone`. Только `model_weights/` — сама папка в `.gitignore`, её нужно собрать руками один раз:
 
 ```bash
 cd weather-interpretability
 mkdir -p model_weights
 ln -s /srv/exw/checkpoints/pangu_weather_24/pangu_weather_24.onnx model_weights/pangu_weather_24.onnx
-ln -s /srv/exw/data/irina_weather_interpretability data
-ln -s /srv/exw/runs/irina_weather_interpretability results
 ```
 
 ## Workflow: ветки
