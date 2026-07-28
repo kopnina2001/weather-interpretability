@@ -68,6 +68,25 @@ ds = xr.open_zarr(
 - `01_era5_visualization.ipynb` — визуализация трёх синоптических кейсов (Storm Eunice, волна тепла/блокинг, спокойный день) из ARCO ERA5
 - `02_saliency_experiment.ipynb` — occlusion saliency на Pangu-Weather (global per-variable + spatial patch + сравнение с ground truth). Тяжёлые вычисления считаются `run_case_occlusion.py` параллельно на 3 GPU
 - `03_output_correlation.ipynb` — корреляционная матрица выходов модели (raw/anomaly, модель vs ground truth, локальная пространственная корреляция)
+- `04_aurora_vs_pangu.ipynb` — Aurora (Microsoft, 0.25° pretrained, 1.26B, PyTorch) baseline-прогноз на тех же 3 кейсах, сравнение RMSE и карт с Pangu-Weather и ground truth. Baseline считается `run_case_aurora.py`, параллельно на 3 GPU
+
+## Aurora — важные находки (см. `run_case_aurora.py`)
+
+Три нюанса, из-за которых прямое использование `aurora.rollout()` не работало на одной V100 (32GB):
+
+1. **`Metadata.time` — один элемент, не по одному на каждый входной таймстеп.** Aurora требует 2 входных
+   времени (t-6h и t) в тензорах, но `metadata.time` — всегда 1-кортеж (текущее/референсное время). Передача
+   2-элементного кортежа не бросает ошибку, но задирает потребление памяти на многошаговом rollout до OOM —
+   баг тихий, трудно диагностируемый.
+2. **`aurora.rollout()` сама по себе даёт лишний memory overhead** (~8GB) относительно прямого вызова
+   `model.forward()` — вероятно, из-за повторного `batch_transform_hook`/`type`/`crop`/`to(device)` на каждом
+   шаге. Обошли: ручной 4-шаговый rollout, вызывая `model.forward()` напрямую и продвигая batch через
+   `aurora.rollout._advance_batch()` (тот же helper, что использует сама `rollout()`).
+3. **Выходная сетка — 720 широт, не 721** (модель обрезает южный полюс, -90°). Нужно один раз обрезать входной
+   batch через `batch.crop(model.patch_size)` перед циклом, иначе `_advance_batch` падает на несовпадении shape.
+
+С `torch.autocast('cuda', dtype=torch.float16)` (не `model.half()` — ломает числовую проверку на `lat`/`lon`,
+которые должны остаться fp32) — стабильно **19.6GB на шаг**, 4 шага (24h) укладываются с большим запасом.
 
 ## Окружение
 
