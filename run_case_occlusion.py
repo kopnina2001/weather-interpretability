@@ -72,8 +72,8 @@ def run_model(input_surface, input_upper):
 
 
 log('Building input tensors...')
-surface_ds = to_pangu_lon(xr.open_dataset(f'data/{case}_surface.nc'))
-upper_ds = to_pangu_lon(xr.open_dataset(f'data/{case}_upper_air.nc')).sel(level=PRESSURE_LEVELS_HPA)
+surface_ds = to_pangu_lon(xr.open_zarr(f'data/{case}_surface.zarr'))
+upper_ds = to_pangu_lon(xr.open_zarr(f'data/{case}_upper_air.zarr')).sel(level=PRESSURE_LEVELS_HPA)
 input_surface = np.stack([surface_ds[v].values for v in SURFACE_ORDER], axis=0).astype(np.float32)
 input_upper = np.stack([upper_ds[v].values for v in UPPER_ORDER], axis=0).astype(np.float32)
 assert input_surface.shape == (4, 721, 1440)
