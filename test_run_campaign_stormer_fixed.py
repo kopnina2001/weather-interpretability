@@ -36,7 +36,7 @@ TARGET_LAT = np.linspace(-90 + 1.40625 / 2, 90 - 1.40625 / 2, 128)
 TARGET_LON = np.arange(0, 360, 1.40625)
 
 N_STEPS = 8  # 8 x 6h = 48h
-RESULTS_DIR = os.path.expanduser('~/weather-interpretability/results/campaign_stormer')
+RESULTS_DIR = os.path.expanduser('~/weather-interpretability/results/campaign_stormer_test_fixed')
 os.makedirs(RESULTS_DIR, exist_ok=True)
 DATA_ROOT = '/srv/exw/data/irina_weather_interpretability'
 
@@ -57,7 +57,7 @@ clim_lat = xr.DataArray(np.linspace(90, -90, 721), dims='latitude')  # native AR
 clim_lon = xr.DataArray(np.arange(0, 360, 0.25), dims='longitude')
 
 climatology_regridded = {}
-for month in range(1, 13):
+for month in [1]:
     surf_da = xr.DataArray(climatology_raw[month]['surface'], dims=['var', 'latitude', 'longitude'],
                             coords={'latitude': clim_lat, 'longitude': clim_lon})
     upp_da = xr.DataArray(climatology_raw[month]['upper'], dims=['var', 'level', 'latitude', 'longitude'],
@@ -118,9 +118,9 @@ def build_input(time_val):
 
 
 init_dates = []
-for year in [2024, 2025]:
-    for month in range(1, 13):
-        for day in [1, 9, 17, 25]:
+for year in [2024]:
+    for month in [1]:
+        for day in [9, 17]:
             init_dates.append(np.datetime64(f'{year}-{month:02d}-{day:02d}T00:00'))
 log(f'{len(init_dates)} init dates queued')
 
