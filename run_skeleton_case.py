@@ -44,7 +44,7 @@ from aurora.rollout import _advance_batch
 DATA_ROOT = '/srv/exw/data/irina_weather_interpretability'
 INIT_TIME = np.datetime64('2024-09-15T00:00')
 N_STEPS = 4
-K_LANDMARKS = 24  # number of landmark rows/columns to keep in the skeleton decomposition
+K_LANDMARKS = 256  # number of landmark rows/columns to keep in the skeleton decomposition
 OUT_PATH = os.path.expanduser('~/weather-interpretability/results/skeleton_decomposition/bebinca_aurora.pkl')
 os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
 
