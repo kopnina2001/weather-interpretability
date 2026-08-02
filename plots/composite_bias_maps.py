@@ -23,16 +23,22 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 
-MODEL, CROP, PATCH = 'aurora', 720, 'Z1000'
+import sys
+MODEL = sys.argv[1] if len(sys.argv) > 1 else 'aurora'
+PATCH = sys.argv[2] if len(sys.argv) > 2 else 'Z1000'
+CROP = 720 if MODEL == 'aurora' else None
 ALPHAS = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
 MID = [0.2, 0.4, 0.6, 0.8]          # these live in the dose_response directory
 FIELDS = ['Q1000', 'T1000', 'U1000', 'V1000']
 LEADS = [6, 24]
 
 DATA_ROOT = '/srv/exw/data/irina_weather_interpretability'
-BASE_DIR = os.path.expanduser('~/weather-interpretability/results/patching/patching_19var')
-DR_DIR = os.path.expanduser(f'~/weather-interpretability/results/dose_response/dose_response_z1000_{MODEL}')
-OUT_DIR = os.path.expanduser('~/weather-interpretability/results/dose_response/composite_bias')
+BASE_DIR = os.path.expanduser('~/weather-interpretability/results/patching/patching_19var'
+                              + ('' if MODEL == 'aurora' else f'_{MODEL}'))
+DR_DIR = os.path.expanduser(
+    f'~/weather-interpretability/results/dose_response/{PATCH.lower()}/{MODEL}')
+OUT_DIR = os.path.expanduser(
+    f'~/weather-interpretability/results/dose_response/{PATCH.lower()}/composite_bias_{MODEL}')
 FIG_DIR = os.path.expanduser('~/weather-interpretability/figures/bias_maps')
 os.makedirs(OUT_DIR, exist_ok=True)
 os.makedirs(FIG_DIR, exist_ok=True)
@@ -47,8 +53,10 @@ ALL_DATES = {f'{y}{m:02d}{d:02d}_{h:02d}': np.datetime64(f'{y}-{m:02d}-{d:02d}T{
 
 ds_upper = xr.open_zarr(f'{DATA_ROOT}/era5_2024_2025_6h_upper.zarr', chunks=None)
 lat = ds_upper.latitude.values[:CROP]
+NLAT = lat.size            # Pangu keeps all 721 latitudes, Aurora crops to 720
 lon = ds_upper.longitude.values
 
+TITLE = {'aurora': 'Aurora', 'pangu': 'Pangu-Weather', 'stormer': 'Stormer'}[MODEL]
 dates = sorted(os.path.basename(f).replace(f'_{MODEL}.npz', '')
                for f in glob.glob(os.path.join(DR_DIR, f'*_{MODEL}.npz')))
 dates = [d for d in dates if os.path.exists(os.path.join(BASE_DIR, f'{d}_{MODEL}.npz'))]
@@ -56,7 +64,7 @@ N = len(dates)
 print(f'{N} дат', flush=True)
 
 # accumulate sum of squared errors per pixel: sse[lead][alpha][field]
-sse = {L: {a: {f: np.zeros((CROP, lon.size), dtype=np.float64) for f in FIELDS}
+sse = {L: {a: {f: np.zeros((NLAT, lon.size), dtype=np.float64) for f in FIELDS}
            for a in ALPHAS} for L in LEADS}
 
 for i, label in enumerate(dates, 1):
@@ -85,7 +93,7 @@ for i, label in enumerate(dates, 1):
 rmse = {L: {a: {f: np.sqrt(sse[L][a][f] / N) for f in FIELDS} for a in ALPHAS} for L in LEADS}
 delta = {L: {a: {f: rmse[L][a][f] - rmse[L][0.0][f] for f in FIELDS} for a in ALPHAS} for L in LEADS}
 
-np.savez_compressed(os.path.join(OUT_DIR, f'composite_rmse_{PATCH}_{MODEL}_n{N}.npz'),
+np.savez_compressed(os.path.join(OUT_DIR, f'composite_rmse_{MODEL}_{PATCH}_n{N}.npz'),
                     **{f'rmse_lead{L}_a{a}_{f}': rmse[L][a][f]
                        for L in LEADS for a in ALPHAS for f in FIELDS},
                     lat=lat, lon=lon, n_dates=np.array([N]))
@@ -116,11 +124,11 @@ for L in LEADS:
                          f'хуже на {worse:.0f}% узлов,  средняя RMSE ×{ratio:.2f}',
                          fontsize=9.5, pad=8)
         extra = '   (контроль: тождественно нуль)' if a == 0.0 else ''
-        fig.suptitle(f'Aurora, композит по {N} датам, лид +{L}ч:  подмена {PATCH} '
+        fig.suptitle(f'{TITLE}, композит по {N} датам, лид +{L}ч:  подмена {PATCH} '
                      f'с долей климатологии α = {a:g}{extra}\n'
                      f'попиксельная RMSE по датам, минус то же при α=0   '
                      f'(красное — стало хуже; шкала общая для всех α)', fontsize=12, y=0.97)
-        out = f'{FIG_DIR}/composite_bias_{PATCH}_lead{L}_alpha{a:g}_n{N}.png'
+        out = f'{FIG_DIR}/composite_bias_{MODEL}_{PATCH}_lead{L}_alpha{a:g}_n{N}.png'
         plt.savefig(out, dpi=140)
         plt.close(fig)
         print('saved', out, flush=True)

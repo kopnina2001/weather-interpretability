@@ -20,11 +20,14 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-MODEL, PATCH = 'aurora', 'Z1000'
+import sys
+MODEL = sys.argv[1] if len(sys.argv) > 1 else 'aurora'
+PATCH = sys.argv[2] if len(sys.argv) > 2 else 'Z1000'
 ALPHAS = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
 LEADS = [6, 24]
 
-DR_DIR = os.path.expanduser(f'~/weather-interpretability/results/dose_response/dose_response_z1000_{MODEL}')
+DR_DIR = os.path.expanduser(
+    f'~/weather-interpretability/results/dose_response/{PATCH.lower()}/{MODEL}')
 FIG_DIR = os.path.expanduser('~/weather-interpretability/figures/dose_response')
 os.makedirs(FIG_DIR, exist_ok=True)
 
@@ -42,11 +45,12 @@ df = pd.read_pickle(os.path.join(DR_DIR, f'dose_matrix_{MODEL}.pkl'))
 n = df.date.nunique()
 print(f'{n} дат', flush=True)
 
+TITLE = {'aurora': 'Aurora', 'pangu': 'Pangu-Weather', 'stormer': 'Stormer'}[MODEL]
 A = np.array(ALPHAS)
 for lead in LEADS:
-    g = df[df.lead == lead].groupby(['output', 'alpha'])['rmse_norm'].mean().unstack()
+    g = df[df.lead == lead].groupby(['output', 'alpha'])['rmse_anom'].mean().unstack()
     fig, axes = plt.subplots(2, 3, figsize=(15.5, 9))
-    print(f'\n+{lead}ч, наклон k прямой RMSE/σ по α:')
+    print(f'\n+{lead}ч, наклон k, нормировка на СКО аномалии:')
     for ax, (title, items) in zip(axes.ravel(), PANELS):
         for f, col, mk in items:
             y = np.array([g.loc[f, a] for a in ALPHAS])
@@ -65,11 +69,12 @@ for lead in LEADS:
     for ax in axes[1]:
         ax.set_xlabel(r'$\alpha$ — доля климатологии во входном ' + PATCH, fontsize=10)
     for ax in axes[:, 0]:
-        ax.set_ylabel(r'RMSE / $\sigma_w$(правда)', fontsize=10)
-    fig.suptitle(f'Aurora +{lead}ч: все 19 полей прогноза при плавной подмене {PATCH} '
+        ax.set_ylabel(r'RMSE / $\sigma_w$(аномалии)', fontsize=10)
+    fig.suptitle(f'{TITLE} +{lead}ч: все 19 полей прогноза при плавной подмене {PATCH} '
                  f'климатологией  (среднее по {n} датам)\n'
-                 f'маркеры — измеренные точки;  пунктир — МНК-прямая, k — её наклон '
-                 f'(чувствительность поля к порче {PATCH})', fontsize=12.5)
+                 f'маркеры — измеренные точки;  пунктир — МНК-прямая, k — её наклон.  '
+                 f'Нормировка на СКО аномалии: y = 1 — прогноз не лучше климатологии',
+                 fontsize=12.5)
     plt.tight_layout(rect=[0, 0, 1, 0.935])
     out = f'{FIG_DIR}/dose_panels_{PATCH}_lead{lead}_{MODEL}_n{n}.png'
     plt.savefig(out, dpi=150)

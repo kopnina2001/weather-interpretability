@@ -26,14 +26,15 @@ os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 MODEL = sys.argv[1]
 WORKER = sys.argv[2]
 DATES_ARG = sys.argv[3].split(',')
+PATCH = sys.argv[4] if len(sys.argv) > 4 else 'Z1000'
 
 ALPHAS = [0.2, 0.4, 0.6, 0.8]        # 0.0 and 1.0 already exist in patching_19var*
-PATCH_VARS = ['Z1000']
+PATCH_VARS = [PATCH]
 N_STEPS = 4
 KEEP_STEPS = {0: 6, 3: 24}
 
 DATA_ROOT = '/srv/exw/data/irina_weather_interpretability'
-OUT_DIR = os.path.expanduser(f'~/weather-interpretability/results/dose_response/dose_response_z1000_{MODEL}')
+OUT_DIR = os.path.expanduser(f'~/weather-interpretability/results/dose_response/{PATCH.lower()}/{MODEL}')
 os.makedirs(OUT_DIR, exist_ok=True)
 
 _tri = [(2024, m, d) for m in range(1, 13) for d in (4, 11, 18, 25)]
