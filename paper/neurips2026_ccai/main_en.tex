@@ -28,14 +28,14 @@
 \newcommand{\rmse}{\operatorname{RMSE}}
 \newcommand{\acc}{\operatorname{ACC}}
 
-\title{Climatology Patching Exposes Cross-Variable Dependencies in AI Weather Forecasts}
+\title{Interpretability Methods for Transformer-Based Weather Forecasting Models}
 \author{Anonymous Author(s)}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Forecast skill scores do not show which input fields a weather model needs or which fields it reconstructs from context. We audit this dependence without gradients by replacing one atmospheric input field with climatology matched by day of year and UTC hour, while holding the other inputs fixed. Repeating the intervention over 19 fields gives a directed $19\times19$ sensitivity matrix. Across 48 seasonally balanced initializations from 2024, the off-diagonal matrices of Aurora and Pangu-Weather correlate at $r=0.913$, yet individual dependencies are strongly asymmetric. At +6 h, patching $Z850$ changes $V850$ about nine times more than the reverse in both models. A six-point $Z1000$ dose sweep rises without saturation and separates the models: the $T1000$ slope falls from $0.690$ at +6 h to $0.217$ at +24 h for Aurora, but rises from $0.406$ to $0.614$ for Pangu-Weather. At full replacement, $T1000$ RMSE increases by $6.02\times$ and $3.35\times$, respectively, at +6 h. These values describe a finite stress test of a fixed model. They do not identify causal relations in the atmosphere.
+Forecast skill scores do not show which input fields a weather model needs or which fields it reconstructs from context. We audit this dependence without gradients by replacing one atmospheric input field with climatology matched by day of year and UTC hour, while holding the other inputs fixed. Repeating the intervention over 19 fields gives a directed $19\times19$ sensitivity matrix. Across 48 seasonally balanced initializations from 2024, the off-diagonal matrices of Aurora and Pangu-Weather correlate at $r=0.913$, yet individual dependencies are strongly asymmetric. At +6 h, patching $Z850$ changes $V850$ about nine times more than the reverse in both models. $Z500$ self-sensitivity roughly halves by +24 h in both models, consistent with partial attenuation of the input error, while cross-field effects remain. A six-point $Z1000$ dose sweep separates the models: the $T1000$ slope falls from $0.690$ at +6 h to $0.217$ at +24 h for Aurora, but rises from $0.406$ to $0.614$ for Pangu-Weather. At full replacement, $T1000$ RMSE increases by $6.02\times$ and $3.35\times$, respectively, at +6 h. These values describe a finite stress test of a fixed model, not causal relations in the atmosphere.
 \end{abstract}
 
 \section{Introduction}
@@ -46,9 +46,9 @@ We replace one input field with its expected seasonal and diurnal state, then me
 
 \section{Methods}
 
-\subsection{Data, models, and sampling}
+\subsection{Evaluation data and forecast models}
 
-ERA5 provides initial states and verification truth~\citep{hersbach2020era5}; WeatherBench 2 climatology is matched by day of year and UTC hour and is computed over 1990--2019~\citep{rasp2024weatherbench2}. We evaluate Aurora (1.3B parameters; two input times) and Pangu-Weather (256M; one input time) on their $0.25^\circ$ grids. The audit uses 48 initializations in 2024: four dates per month, with 00/06/12/18 UTC balanced across the sample. The 19 audited fields are MSLP, 10-m $u/v$, 2-m temperature, and geopotential $Z$, specific humidity $Q$, temperature $T$, and $u/v$ wind at 1000, 850, and 500 hPa. Aurora's two input snapshots are both intervened upon.
+ERA5 provides initial states and verification truth~\citep{hersbach2020era5}; WeatherBench 2 climatology is matched by day of year and UTC hour and is computed over 1990--2019~\citep{rasp2024weatherbench2}. We evaluate Aurora (1.3B parameters; two input times) and Pangu-Weather (256M; one input time) on their $0.25^\circ$ grids. The reported $19\times19$ matrices, dose curves, and spatial composites use 48 initializations in 2024: four dates per month, with 00/06/12/18 UTC balanced across the sample. Appendix~\ref{app:provenance} separates this set from the repository's 2024--2025 runs. The 19 audited fields are MSLP, 10-m $u/v$, 2-m temperature, and geopotential $Z$, specific humidity $Q$, temperature $T$, and $u/v$ wind at 1000, 850, and 500 hPa. Aurora's two input snapshots are both intervened upon.
 
 \begin{figure}[t]
 \centering
@@ -69,29 +69,29 @@ ERA5 provides initial states and verification truth~\citep{hersbach2020era5}; We
   \node[lane,text=inkblue] at (-1.15,1.72) {BASELINE};
   \node[lane,text=warmline] at (-1.15,-0.48) {INTERVENTION};
   \node[source] (x) at (0,1.08) {ERA5 state $\mathbf{x}(t)$\\19 fields};
-  \node[clim] (c) at (0,-1.18) {WB2 climatology $\mathbf{c}(d,h)$\\season + UTC hour};
-  \node[model] (mb) at (5.90,1.08) {frozen $f_\theta$\\baseline rollout};
-  \node[patch] (p) at (3.05,-1.18) {$x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\$x_{j\ne v}^{(\alpha)}=x_j$};
-  \node[model] (mp) at (5.90,-1.18) {same $f_\theta$\\patched rollout};
-  \node[forecast] (yb) at (8.45,1.08) {$\hat y_u^{(0)}$\\+6 h, +24 h};
-  \node[forecast] (yp) at (8.45,-1.18) {$\hat y_u^{(v,\alpha)}$\\+6 h, +24 h};
-  \node[metric] (m) at (11.40,0) {$S_{vu}$ and $\Delta\acc_{vu}$\\area-weighted; ERA5 truth};
-  \node[result] (r) at (14.70,0) {directed $19\!\times\!19$ matrices\\dose curves; bias maps};
+  \node[clim] (c) at (-0.10,-1.18) {WB2 climatology $\mathbf{c}(d,h)$\\season + UTC hour};
+  \node[model] (mb) at (6.15,1.08) {frozen $f_\theta$\\baseline rollout};
+  \node[patch] (p) at (3.35,-1.18) {$x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\$x_{j\ne v}^{(\alpha)}=x_j$};
+  \node[model] (mp) at (6.15,-1.18) {same $f_\theta$\\patched rollout};
+  \node[forecast] (yb) at (8.70,1.08) {$\hat y_u^{(0)}$\\+6 h, +24 h};
+  \node[forecast] (yp) at (8.70,-1.18) {$\hat y_u^{(v,\alpha)}$\\+6 h, +24 h};
+  \node[metric] (m) at (11.65,0) {$S_{vu}$ and $\Delta\acc_{vu}$\\area-weighted; ERA5 truth};
+  \node[result] (r) at (14.95,0) {directed $19\!\times\!19$ matrices\\dose curves; bias maps};
   \draw[flow] (x.east) -- (mb.west);
   \draw[flow] (mb.east) -- (yb.west);
-  \draw[patchflow] (x.south) -- ++(0,-0.43) -| (p.north);
+  \draw[patchflow] ([xshift=0.38cm]x.south) to[out=-90,in=105] ([xshift=-0.58cm]p.north);
   \draw[patchflow] (c.east) -- (p.west);
   \draw[patchflow] (p.east) -- (mp.west);
   \draw[patchflow] (mp.east) -- (yp.west);
-  \draw[flow] (yb.east) -- (m.north west);
-  \draw[patchflow] (yp.east) -- (m.south west);
+  \draw[flow] (yb.east) to[out=0,in=165] ([yshift=0.27cm]m.west);
+  \draw[patchflow] (yp.east) to[out=0,in=195] ([yshift=-0.27cm]m.west);
   \draw[flow] (m.east) -- (r.west);
 \end{tikzpicture}}
-\caption{Climatology patching uses paired rollouts. The date, model weights, and 18 untouched fields stay fixed. Full replacement ($\alpha=1$) supplies the matrix entry; six values of $\alpha$ trace the response.}
+\caption{Paired field-replacement audit. The date, model weights, and 18 untouched fields stay fixed. Full replacement ($\alpha=1$) supplies the matrix entry; six values of $\alpha$ trace the response.}
 \label{fig:method}
 \end{figure}
 
-\subsection{Intervention and metrics}
+\subsection{Paired field replacement and metrics}
 
 For input field $v$, $P_v$ replaces that complete global field by climatology. For output field $u$, lead $\tau$, and initialization set $\mathcal D$, we report
 \begin{align}
@@ -104,32 +104,28 @@ All spatial sums use normalized $\cos\phi$ weights. $S$ measures forecast displa
 
 \section{Results}
 
-\subsection{Correlation supplies a descriptive baseline}
-
-The 69-channel Pangu output-anomaly matrix contains coherent vertical blocks for geopotential, humidity, temperature, and wind (Appendix~\ref{app:figures}). Its difference from ERA5 depends on the synoptic case. Single-time sliding-window correlations were also noisy on smooth fields. We retain both diagnostics as checks on association and use patching for directional analysis.
-
 \begin{figure}[t]
 \centering
 \begin{minipage}[t]{0.485\linewidth}
   \centering
-  \includegraphics[width=\linewidth,trim=0.30in 8.65in 10.48in 0.12in,clip]{../../figures/patching_matrices/matrix_19var_aurora_n48_weighted.png}
-  \\(a) Aurora, +6 h
+  \includegraphics[width=\linewidth,trim=0.30in 0.12in 10.48in 8.65in,clip]{../../figures/patching_matrices/matrix_19var_aurora_n48_weighted.png}
+  \\(a) Aurora, $\Delta\acc_w$, +6 h
 \end{minipage}\hfill
 \begin{minipage}[t]{0.485\linewidth}
   \centering
-  \includegraphics[width=\linewidth,trim=0.30in 8.65in 10.35in 0.12in,clip]{../../figures/patching_matrices/matrix_19var_pangu_n48_weighted.png}
-  \\(b) Pangu-Weather, +6 h
+  \includegraphics[width=\linewidth,trim=0.30in 0.12in 10.35in 8.65in,clip]{../../figures/patching_matrices/matrix_19var_pangu_n48_weighted.png}
+  \\(b) Pangu-Weather, $\Delta\acc_w$, +6 h
 \end{minipage}
-\caption{Area-weighted directed sensitivity $S_{vu}$ for both models (row: patched input; column: affected output). The color scales are fitted separately, so comparisons should use the printed cell values. Full +6/+24 h sensitivity and $\Delta\acc$ panels appear in Appendix~\ref{app:figures}.}
+\caption{Verified cross-field skill loss at +6 h. The panels show area-weighted $\Delta\acc_{vu}$ (row: patched input; column: affected output); negative values mean lower anomaly skill. Each crop retains the scale of its parent matrix, so comparisons should use the printed cell values. Full +6/+24 h panels appear in Appendix~\ref{app:figures}.}
 \label{fig:matrixoverview}
 \end{figure}
 
-\subsection{Directed matrices reveal asymmetry and redundancy}
+\subsection{A field error can attenuate while spreading}
 
-The off-diagonal entries of Aurora and Pangu correlate at $r=0.913$, but neither matrix is symmetric (Fig.~\ref{fig:matrixoverview}). At +6 h, $S_{Z850,V850}$ is $0.38$ for Aurora and $0.47$ for Pangu; the reverse entries are $0.04$ and $0.05$. The roughly ninefold contrast appears in both architectures. Diagonal entries distinguish fields that the network can reconstruct from context. Aurora gives $S_{Z500,Z500}=0.08$ and $S_{\mathrm{MSLP},\mathrm{MSLP}}=0.45$ at +6 h; Pangu gives $0.19$ and $0.53$. These values support redundancy in $Z500$ and stronger unique dependence on MSLP, especially for Aurora.
+The off-diagonal sensitivity entries of Aurora and Pangu correlate at $r=0.913$, but neither matrix is symmetric (Appendix~\ref{app:fullmatrices}). Figure~\ref{fig:matrixoverview} shows the corresponding change in verified anomaly skill. At +6 h, $S_{Z850,V850}$ is $0.38$ for Aurora and $0.47$ for Pangu; the reverse entries are $0.04$ and $0.05$. The roughly ninefold contrast appears in both architectures. Diagonal entries distinguish fields that the network can reconstruct from context. Aurora gives $S_{Z500,Z500}=0.08$ and $S_{\mathrm{MSLP},\mathrm{MSLP}}=0.45$ at +6 h; Pangu gives $0.19$ and $0.53$. These values support redundancy in $Z500$ and stronger unique dependence on MSLP, especially for Aurora.
 
 \begin{table}[t]
-\caption{Main results, averaged over 48 dates. The repository stores point estimates but no date-block confidence intervals.}
+\caption{Measured error attenuation and transfer over 48 dates. The repository stores point estimates but no date-block confidence intervals.}
 \label{tab:results}
 \centering
 \small
@@ -139,20 +135,20 @@ Diagnostic & Evidence & Interpretation \\
 \midrule
 Cross-model structure & off-diagonal $r=0.913$ & many dependencies recur across architectures \\
 Direction at +6 h & $Z850\!\to V850$: $0.38/0.47$; reverse: $0.04/0.05$ (Aurora/Pangu) & mass-to-wind dependence is about ninefold stronger \\
-Diagonal contrast at +6 h & $Z500$: $0.08/0.19$; MSLP: $0.45/0.53$ & MSLP is less recoverable from context \\
+Partial attenuation & $S_{Z500,Z500}$: $0.08\to0.04$ / $0.19\to0.09$ (+6$\to$+24 h) & the patched field moves back toward the baseline in both models \\
 $T1000$ dose slope & Aurora: $0.690\to0.217$; Pangu: $0.406\to0.614$ (+6$\to$+24 h) & lead-time behavior differs by model \\
 $T1000$ spatial RMSE & Aurora: $6.02\times/2.01\times$; Pangu: $3.35\times/3.06\times$ (+6/+24 h) & the response covers 99--100\% of grid cells \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\subsection{Dose response separates the models}
+\subsection{\texorpdfstring{$Z1000$}{Z1000} perturbations expose different lead-time responses}
 
 All six $Z1000$ dose points rise, with no plateau before $\alpha=1$. For Aurora at +6 h, the fitted slopes are $0.690$ for $T1000$, $0.274$ for $Q1000$, and $0.180/0.187$ for $U/V1000$. The $T1000$ slope falls to $0.217$ at +24 h. Pangu follows a different lead-time pattern: its $T1000$ slope rises from $0.406$ to $0.614$, and its $T2M$ slope rises from $0.387$ to $0.570$. The full replacement therefore ranks finite model sensitivity, while the intermediate points show why it should not be read as an infinitesimal Jacobian.
 
-\subsection{Spatial composites show persistent, model-specific error}
+\subsection{\texorpdfstring{$Z1000$}{Z1000} error spreads across latitude bands}
 
-The $T1000$ composite in Fig.~\ref{fig:bias} reports temporal RMSE at every grid cell, patched minus baseline. At +6 h, full $Z1000$ replacement raises the global mean of per-cell $T1000$ RMSE by $6.02\times$ for Aurora and $3.35\times$ for Pangu. At +24 h, the ratios are $2.01\times$ and $3.06\times$. The increase covers 99--100\% of cells. Aurora weakens markedly by +24 h; Pangu retains most of its response. Both maps concentrate large increments in mid and high latitudes, while Pangu shows broader tropical and subtropical increments.
+The $T1000$ composite in Fig.~\ref{fig:bias} reports temporal RMSE at every grid cell, patched minus baseline. At +6 h, full $Z1000$ replacement raises the global mean of per-cell $T1000$ RMSE by $6.02\times$ for Aurora and $3.35\times$ for Pangu. At +24 h, the ratios are $2.01\times$ and $3.06\times$. The increase covers 99--100\% of cells. Aurora weakens markedly by +24 h; Pangu retains most of its response. Large increments concentrate in mid and high latitudes, while Pangu shows broader tropical and subtropical increments.
 
 \begin{figure}[t]
 \centering
@@ -177,17 +173,17 @@ The $T1000$ composite in Fig.~\ref{fig:bias} reports temporal RMSE at every grid
   \includegraphics[width=\linewidth,trim=8.10in 5.55in 0.20in 1.58in,clip]{../../figures/bias_maps/composite_bias_pangu_Z1000_lead24_alpha1_n48.png}
   \\(d) Pangu-Weather, +24 h: $3.06\times$
 \end{minipage}
-\caption{$T1000$ change in per-grid-cell temporal RMSE after full $Z1000$ replacement ($\alpha=1$). Red marks larger error than the baseline. Each panel keeps its source color scale; the labels report the global mean ratio of per-cell RMSE.}
+\caption{Geographic footprint of a $Z1000$ input error. The panels show the change in per-grid-cell temporal RMSE of $T1000$ after full replacement ($\alpha=1$); red marks larger error than the baseline. Labels give the global mean ratio of per-cell RMSE. The latitude structure motivates testing field-specific spatial weights, but does not validate them.}
 \label{fig:bias}
 \end{figure}
 
 \section{Discussion}
 
-Mass--wind coupling and the relation between geopotential thickness and lower-tropospheric temperature make the main patterns physically plausible. The intervention still identifies dependence inside a fitted network only. Replacing a complete field with climatology is a large, partly out-of-distribution change, and single-time spatial correlations mix geography, season, and dynamics.
+Mass--wind coupling and geopotential--temperature coupling make the main patterns plausible. The broad $Z1000/Z850$ rows may reflect stronger interaction of lower pressure levels with orography and below-ground extrapolation, but this needs an orography-stratified test. The falling $Z500$ diagonal and persistent off-diagonal entries indicate partial internal correction with error transfer; Pangu's growing $T1000$ response shows that correction is not universal. Dose slopes and latitude maps can propose field- and latitude-specific loss weights, but matched retraining must test them (Appendix~\ref{app:training}).
 
-The evaluation covers 48 dates from one year, two short leads, and three pressure levels. It has no ensembles or date-block bootstrap intervals. The raw arrays live in an external cluster store that was unavailable during paper assembly, so we checked the numbers against committed figures, captions, and analysis code without recomputing them. Operational evaluation needs uncertainty intervals, event stratification, longer leads, and true issue-time data.
+The primary evaluation covers 48 dates from 2024, two short leads, and three pressure levels. It has no ensembles or date-block bootstrap intervals. A separate reduced-field Aurora run spans 2024--2025, but it cannot supply two-year uncertainty estimates for the main two-model comparison. The raw arrays live in an external cluster store that was unavailable during paper assembly, so we checked the numbers against committed figures, captions, and analysis code without recomputing them. Operational evaluation needs uncertainty intervals, broader sampling, longer leads, and true issue-time data.
 
-\paragraph{Climate relevance and risks.} Forecast developers can use the audit to find brittle channel dependence before a model enters an early-warning or climate-service pipeline. The audit does not improve forecast skill, quantify anthropogenic climate change, or validate a decision rule. It should sit beside standard skill, calibration, and expert review. The next experiment should repeat the paired intervention across events and forecast ranges, with date-block uncertainty intervals computed from issue-time data.
+\paragraph{Climate relevance and risks.} Forecast developers can use the audit to find brittle channel dependence before a model enters an early-warning or climate-service pipeline. The audit does not improve forecast skill, quantify anthropogenic climate change, or validate a decision rule. It should sit beside standard skill, calibration, and expert review. Probabilistic and ground-truth-correction experiments are specified in Appendix~\ref{app:future}.
 
 \clearpage
 \bibliographystyle{unsrt}
@@ -195,85 +191,147 @@ The evaluation covers 48 dates from one year, two short leads, and three pressur
 
 \clearpage
 \appendix
-\section{Full-resolution visual evidence}
+\section{Supplementary diagnostics and evaluation provenance}
 \label{app:figures}
+\renewcommand{\thefigure}{A\arabic{figure}}
+\renewcommand{\theHfigure}{A\arabic{figure}}
+\setcounter{figure}{0}
 
-\begin{figure}[ht]
-\centering
-\includegraphics[width=\linewidth]{../../figures/model_comparison/storm_eunice_corr_model_anomaly.png}
-\caption{Representative 69-channel output-anomaly correlation matrix for Pangu-Weather on Storm Eunice. The visible block structure is descriptive and non-directional.}
-\end{figure}
+\subsection{Data splits and matrix conventions}
+\label{app:provenance}
 
-\begin{figure}[p]
-\centering
-\includegraphics[width=\linewidth]{../../figures/model_comparison/storm_eunice_corr_diff_anomaly.png}
-\caption{Pangu-Weather minus ERA5 anomaly-correlation structure for the same case.}
-\end{figure}
+The repository contains several evaluation sets. Its ERA5 cache and broad forecast-verification campaign cover 2024--2025. The paired results in the main paper use a narrower common set: 48 dates from 2024 for both models, all 19 fields, and leads of +6 and +24 h. A separate Aurora-only audit uses seven fields and 48 dates split across 2024--2025. We report that audit below as a temporal check and do not pool it with the two-model estimates.
+
+Every matrix uses rows for patched inputs and columns for affected outputs. $S_{vu}\geq0$ measures displacement from the unpatched forecast after normalization by the verified field scale. A large diagonal entry means that the model cannot reconstruct that input from the other 18 fields; an off-diagonal entry records propagation into another output. $\Delta\acc_{vu}<0$ means that the same intervention reduces anomaly skill against ERA5. Color limits differ by model, lead, and metric. Cross-panel comparisons therefore use the cell values, not hue.
+
+\subsection{Nineteen-field error-transfer matrices}
+\label{app:fullmatrices}
 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/patching_matrices/matrix_19var_aurora_n48_weighted.png}
-\caption{Aurora: full area-weighted relative-sensitivity and $\Delta$ACC matrices at +6 and +24 h ($n=48$).}
+\caption{Aurora error-transfer matrices over 48 dates in 2024. Top: area-weighted sensitivity $S$; bottom: $\Delta\acc$; left: +6 h; right: +24 h. At +6 h, $Z850\!\to V850=0.38$ while $V850\!\to Z850=0.04$. The MSLP and $Z500$ diagonal entries ($0.45$ and $0.08$) separate unique input influence from contextual reconstruction. Negative values in the lower panels are losses of verified anomaly skill.}
+\label{fig:app-aurora-matrix}
 \end{figure}
 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/patching_matrices/matrix_19var_pangu_n48_weighted.png}
-\caption{Pangu-Weather: full area-weighted relative-sensitivity and $\Delta$ACC matrices at +6 and +24 h ($n=48$).}
+\caption{Pangu-Weather error-transfer matrices over the same 48 dates. Panel order and metrics match Fig.~\ref{fig:app-aurora-matrix}. At +6 h, $Z850\!\to V850=0.47$ and the reverse entry is $0.05$; MSLP and $Z500$ diagonal sensitivities are $0.53$ and $0.19$. The recurring directionality explains the high cross-model off-diagonal correlation ($r=0.913$), while the larger Pangu diagonal values show that agreement in structure does not imply equal magnitude.}
+\label{fig:app-pangu-matrix}
 \end{figure}
+
+The strongest shared pattern is directional coupling from mass fields into wind. Rows associated with $Z850$ and $Z500$ affect several wind outputs, whereas patching wind usually produces a smaller response in geopotential. The lower panels answer a different question: whether forecast displacement also degrades verification. Most entries are negative, but their magnitude is not proportional to $S$ because a displaced forecast can retain spatial anomaly correlation.
+
+\subsection{Aurora seven-field audit, 2024--2025}
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth]{../../figures/patching_matrices/diagonal_matrix_seasonal_48dates.png}
+\caption{Two-year Aurora check on seven fields and 48 dates spanning 2024--2025. These panels use unweighted spatial statistics and are not pooled with the area-weighted 19-field results. The +6 h diagonal ordering persists: MSLP sensitivity is $0.46$ and $Z500$ sensitivity is $0.08$; at +24 h they are $0.27$ and $0.04$. $Z850\!\to V850$ remains stronger than its reverse. This check does not extend the Pangu comparison beyond 2024.}
+\label{fig:app-two-year}
+\end{figure}
+
+\subsection{Candidate field and latitude weights}
+\label{app:training}
+
+\begin{figure}[p]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize,align=center,inner sep=5pt},
+  measured/.style={draw=inkblue,rounded corners=2.5pt,fill=datablue,minimum width=3.15cm,minimum height=1.05cm,line width=0.7pt},
+  finding/.style={draw=warmline,rounded corners=2.5pt,fill=climorange,minimum width=3.25cm,minimum height=1.05cm,line width=0.7pt},
+  proposal/.style={draw=violet!55!black,rounded corners=2.5pt,fill=resultpurple,minimum width=3.35cm,minimum height=1.05cm,line width=0.7pt},
+  arrow/.style={-{Latex[length=2.2mm,width=1.4mm]},draw=black!65,line width=0.75pt},
+  dashedarrow/.style={arrow,dashed,draw=violet!65!black}
+]
+  \node[measured] (dose) at (0,0) {controlled field error\\$x_M^{(\alpha)}=(1-\alpha)x_M+\alpha c_M$};
+  \node[measured] (matrix) at (4.20,0) {paired rollouts\\$S_{MN}(\tau,\alpha),\ \Delta\acc_{MN}$};
+  \node[finding] (repair) at (8.55,1.35) {attenuation in field $M$\\$R_M=S_{MM}(24)/S_{MM}(6)$};
+  \node[finding] (transfer) at (8.55,0) {transfer into other fields\\$I_M=\sum_{N\ne M}S_{MN}$};
+  \node[finding] (latitude) at (8.55,-1.35) {where error accumulates\\$E_{MN}(\phi)$ from grid-cell maps};
+  \node[proposal] (loss) at (13.05,0) {matched retraining test\\$\mathcal L=\sum_N\lambda_N\sum_s w_N(\phi_s)\ell_N(s)$};
+  \draw[arrow] (dose.east) -- (matrix.west);
+  \draw[arrow] (matrix.east) to[out=15,in=180] (repair.west);
+  \draw[arrow] (matrix.east) -- (transfer.west);
+  \draw[arrow] (matrix.east) to[out=-15,in=180] (latitude.west);
+  \draw[dashedarrow] (repair.east) to[out=0,in=155] (loss.north west);
+  \draw[dashedarrow] (transfer.east) -- (loss.west);
+  \draw[dashedarrow] (latitude.east) to[out=0,in=205] (loss.south west);
+\end{tikzpicture}}
+\caption{From measured error transfer to a loss-weighting experiment. Solid arrows belong to the audit: a controlled dose yields attenuation, cross-field transfer, and latitude profiles. Dashed arrows mark an unvalidated design step. Influence ranks may set field weights $\lambda_N$, while error profiles may set field-specific spatial weights $w_N(\phi)$. Improvement requires matched retraining against the original loss.}
+\label{fig:app-training}
+\end{figure}
+
+\subsection{Ensemble audit and mid-rollout field correction}
+\label{app:future}
+
+The paired audit should be extended to probabilistic systems with shared random seeds between baseline and patched members. GenCast samples diffusion-based 15-day ensembles~\citep{price2025gencast}; FuXi-S2S generates 42-day ensembles through learned and initial-condition perturbations~\citep{chen2024fuxis2s}; Marchuk uses latent flow matching for ensemble forecasts up to 30 days~\citep{kuzhamuratov2026marchuk}. The report should include the distributions of $S$ and $\Delta\acc$, change in CRPS, and spread--skill behavior, not only the ensemble mean.
+
+A second experiment should replace one predicted field with verifying ERA5 at +6, +12, +24, or +48 h and continue the rollout. Reduced downstream error would locate a correctable transfer pathway; renewed error in the replaced field would measure recurrence. This ground-truth intervention is a retrospective oracle test, not an operational forecast procedure. Running the same replacement for each field and lead would separate errors that the model damps, errors that recur, and errors that contaminate neighboring fields.
+
+\subsection{\texorpdfstring{$Z1000$}{Z1000} dose response}
 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/dose_response/dose_panels_anom_Z1000_lead6_aurora_n48.png}
-\caption{Aurora +6 h dose response for all 19 outputs under $Z1000$ climatology blending. The committed source panel retains its original Russian annotations.}
+\caption{Aurora at +6 h, 48 dates in 2024. Markers show the six measured climatology fractions and dashed lines show least-squares fits. The response has no plateau before $\alpha=1$. $T1000$ has the steepest slope ($0.690$), followed by $Z1000$ ($0.488$) and $Q1000$ ($0.274$). The y-axis is RMSE normalized by anomaly standard deviation; one is the climatological no-skill scale. Source annotations are in Russian.}
+\label{fig:app-dose-aurora-6}
 \end{figure}
 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/dose_response/dose_panels_anom_Z1000_lead24_aurora_n48.png}
-\caption{Aurora +24 h dose response for all 19 outputs under $Z1000$ climatology blending. The committed source panel retains its original Russian annotations.}
+\caption{Aurora at +24 h on the same dates and dose grid as Fig.~\ref{fig:app-dose-aurora-6}. The $T1000$ slope falls to $0.217$ and the $Z1000$ slope to $0.139$, while the $Q1000$ slope is $0.131$. The nonzero intercepts are the baseline forecast errors, not intervention effects. Source annotations are in Russian.}
+\label{fig:app-dose-aurora-24}
 \end{figure}
 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/dose_response/dose_panels_anom_Z1000_lead6_pangu_n48.png}
-\caption{Pangu-Weather +6 h dose response for all 19 outputs. Pangu has a smaller $T1000$ slope than Aurora at this lead, but larger lower-level wind and $T2M$ slopes. The source annotations are in Russian.}
+\caption{Pangu-Weather at +6 h, 48 dates in 2024. The $T1000$ slope is $0.406$, below Aurora's $0.690$, whereas the lower-level wind and $T2M$ responses are steeper. This is a measured finite path from the observed input to climatology; the fitted line summarizes these six points and is not a local derivative. Source annotations are in Russian.}
+\label{fig:app-dose-pangu-6}
 \end{figure}
 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/dose_response/dose_panels_anom_Z1000_lead24_pangu_n48.png}
-\caption{Pangu-Weather +24 h dose response. The $T1000$ and $T2M$ slopes increase with lead, unlike Aurora. The source annotations are in Russian.}
+\caption{Pangu-Weather at +24 h on the same dates and dose grid as Fig.~\ref{fig:app-dose-pangu-6}. The $T1000$ slope rises to $0.614$ and the $T2M$ slope to $0.570$. Aurora weakens over the same lead change, so the difference is in lead-time behavior rather than only scale. Source annotations are in Russian.}
+\label{fig:app-dose-pangu-24}
 \end{figure}
+
+\subsection{Verified skill rows and spatial composites}
 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/patching_matrices/acc_strip_Z_both_n48.png}
-\caption{$\Delta\acc$ rows for patching $Z1000$, $Z850$, and $Z500$ in both models. Each panel uses the scale of its parent matrix; compare the printed values rather than color saturation. The source annotations are in Russian.}
+\caption{$\Delta\acc$ rows for patching $Z1000$, $Z850$, and $Z500$ in both models, using the common 48-date 2024 set. The strip isolates the mass-field interventions from the full matrices. Negative cells record skill loss; near-zero cells mean that the anomaly pattern remains correlated with ERA5 even when the forecast itself moves. Each row retains its parent-matrix scale, so compare printed values rather than color saturation. Source annotations are in Russian.}
+\label{fig:app-acc-strip}
 \end{figure}
 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/bias_maps/composite_bias_Z1000_lead6_alpha1_n48.png}
-\caption{Aurora spatial composite at full $Z1000$ replacement ($\alpha=1$, +6 h). Red denotes larger temporal RMSE than the unpatched baseline.}
+\caption{Aurora spatial composite after full $Z1000$ replacement ($\alpha=1$, +6 h; 48 dates in 2024). Each map is patched minus baseline temporal RMSE at a grid cell. Red therefore marks added error, not a signed forecast bias. $T1000$ has a $6.02\times$ global mean per-cell RMSE ratio, and the increase covers nearly the full grid.}
 \end{figure}
 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/bias_maps/composite_bias_Z1000_lead24_alpha1_n48.png}
-\caption{Aurora spatial composite at +24 h. The response weakens relative to +6 h but remains positive over 93--99\% of cells for the four displayed fields.}
+\caption{Aurora spatial composite at +24 h. The response is weaker than at +6 h: the $T1000$ global mean per-cell RMSE ratio falls from $6.02\times$ to $2.01\times$. The four displayed fields still worsen over 93--99\% of cells, so the smaller global mean is not caused by a small isolated region.}
 \end{figure}
 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/bias_maps/composite_bias_pangu_Z1000_lead6_alpha1_n48.png}
-\caption{Pangu-Weather spatial composite at +6 h. The four displayed fields worsen over 99--100\% of cells.}
+\caption{Pangu-Weather spatial composite at +6 h. The four displayed fields worsen over 99--100\% of cells. For $T1000$, the global mean per-cell RMSE ratio is $3.35\times$, lower than Aurora at this lead, but the map remains broadly positive across latitude bands.}
 \end{figure}
 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/bias_maps/composite_bias_pangu_Z1000_lead24_alpha1_n48.png}
-\caption{Pangu-Weather spatial composite at +24 h. $T1000$ retains a $3.06\times$ global mean per-cell RMSE ratio, compared with $2.01\times$ for Aurora.}
+\caption{Pangu-Weather spatial composite at +24 h. $T1000$ retains a $3.06\times$ global mean per-cell RMSE ratio, close to its +6 h value and above Aurora's $2.01\times$ at this lead. This persistent response is consistent with the Pangu dose slopes, which grow rather than shrink from +6 to +24 h.}
 \end{figure}
 
 \end{document}
