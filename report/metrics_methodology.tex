@@ -1,12 +1,14 @@
 \documentclass[11pt]{article}
-\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage[a4paper,top=1.4cm,bottom=1.3cm,left=1.7cm,right=1.7cm]{geometry}
 \usepackage{fontspec}
 \usepackage{polyglossia}
 \setmainlanguage{russian}
 \setotherlanguage{english}
-\setmainfont{DejaVu Serif}[Scale=0.95]
+\setmainfont{DejaVu Serif}[Scale=0.85]
 \setsansfont{DejaVu Sans}[Scale=0.9]
-\setmonofont{DejaVu Sans Mono}[Scale=0.82]
+\setmonofont{DejaVu Sans Mono}[Scale=0.76]
+\usepackage{setspace}\setstretch{0.90}
+\setlength{\abovedisplayskip}{5pt}\setlength{\belowdisplayskip}{5pt}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{enumitem}
@@ -39,6 +41,16 @@ $N_\lambda = 1440$ долгот, $N_\varphi = 721$ широта. Aurora обре
 $Z_g = \Phi/g_0$ (гпм) при $g_0 = 9.80665$~м/с$^2$: деление на $g_0$ не выполняется. На значения
 в матрицах это не влияет, поскольку обе метрики инвариантны к постоянному множителю~---
 $S_{vu}$ нормирована на СКО того же поля, а $\Delta\!\operatorname{ACC}$ безразмерна.
+
+\paragraph{Взвешивание по площади.} Узлы регулярной широтно-долготной сетки покрывают
+существенно разную площадь: ячейка на широте $89.75^\circ$ меньше экваториальной примерно
+в $\cos(89.75^\circ)\approx 0.004$ раза, но в невзвешенной сумме весила бы столько же. Поэтому
+все суммы ниже берутся с весом $w_s = \cos\varphi_s$ (нормированным на единицу) --- принятая
+в WeatherBench-2 и ECMWF конвенция:
+\[
+w_s = \frac{\cos\varphi_s}{\sum_{s'\in\Omega}\cos\varphi_{s'}},
+\qquad \sum_{s\in\Omega} w_s = 1 .
+\]
 
 \paragraph{Истина.} ERA5, 6-часовой шаг: $y_u(t) \in \mathbb{R}^{\Omega}$~--- поле переменной
 $u$ в момент $t$.
@@ -95,16 +107,16 @@ x_u(t), & u \neq v,
 \[
 \boxed{\;
 S_{vu}(\tau) \;=\; \frac{1}{|\mathcal{D}|}\sum_{t_0\in\mathcal{D}}
-\frac{\operatorname{RMSE}\!\big(\hat y^{(v)}_u(t_0,\tau),\; \hat y^{(0)}_u(t_0,\tau)\big)}
-     {\sigma\big[y_u(t_0+\tau)\big]}
+\frac{\operatorname{RMSE}_w\!\big(\hat y^{(v)}_u(t_0,\tau),\; \hat y^{(0)}_u(t_0,\tau)\big)}
+     {\sigma_w\big[y_u(t_0+\tau)\big]}
 \;}
 \]
 где
 \[
-\operatorname{RMSE}(a,b) = \sqrt{\frac{1}{N}\sum_{s\in\Omega}\big(a_s-b_s\big)^2},
+\operatorname{RMSE}_w(a,b) = \sqrt{\sum_{s\in\Omega} w_s\big(a_s-b_s\big)^2},
 \qquad
-\sigma[a] = \sqrt{\frac{1}{N}\sum_{s\in\Omega}\big(a_s-\bar a\big)^2},\quad
-\bar a = \frac{1}{N}\sum_{s\in\Omega} a_s .
+\sigma_w[a] = \sqrt{\sum_{s\in\Omega} w_s\big(a_s-\bar a_w\big)^2},\quad
+\bar a_w = \sum_{s\in\Omega} w_s\, a_s .
 \]
 Деление на пространственное СКО \emph{истинного} поля делает величину безразмерной, поэтому
 клетки с разными единицами (Па, м$^2$/с$^2$, кг/кг, К, м/с) сопоставимы. Смысл: во сколько раз возмущение
@@ -116,17 +128,17 @@ S_{vu}(\tau) \;=\; \frac{1}{|\mathcal{D}|}\sum_{t_0\in\mathcal{D}}
 Аномальная корреляция (anomaly correlation coefficient) прогноза $\hat y$ с истиной $y$
 относительно климатологии $\bar c$:
 \[
-\operatorname{ACC}(\hat y, y, \bar c) \;=\;
-\frac{\sum_{s\in\Omega}\big(\hat y_s - \bar c_s\big)\big(y_s - \bar c_s\big)}
-     {\sqrt{\sum_{s\in\Omega}\big(\hat y_s - \bar c_s\big)^2}\;
-      \sqrt{\sum_{s\in\Omega}\big(y_s - \bar c_s\big)^2}} \;\in[-1,1].
+\operatorname{ACC}_w(\hat y, y, \bar c) \;=\;
+\frac{\sum_{s\in\Omega} w_s\big(\hat y_s - \bar c_s\big)\big(y_s - \bar c_s\big)}
+     {\sqrt{\sum_{s\in\Omega} w_s\big(\hat y_s - \bar c_s\big)^2}\;
+      \sqrt{\sum_{s\in\Omega} w_s\big(y_s - \bar c_s\big)^2}} \;\in[-1,1].
 \]
 На графике показано, насколько подмена ухудшает эту величину относительно базового прогона:
 \[
 \boxed{\;
 \Delta\!\operatorname{ACC}_{vu}(\tau) \;=\; \frac{1}{|\mathcal{D}|}\sum_{t_0\in\mathcal{D}}
-\Big[\operatorname{ACC}\big(\hat y^{(v)}_u,\, y_u,\, \bar c_u\big)
-   - \operatorname{ACC}\big(\hat y^{(0)}_u,\, y_u,\, \bar c_u\big)\Big]
+\Big[\operatorname{ACC}_w\big(\hat y^{(v)}_u,\, y_u,\, \bar c_u\big)
+   - \operatorname{ACC}_w\big(\hat y^{(0)}_u,\, y_u,\, \bar c_u\big)\Big]
 \;}
 \]
 Отрицательные значения означают потерю качества. В отличие от $S_{vu}$, эта метрика опирается
@@ -135,17 +147,20 @@ S_{vu}(\tau) \;=\; \frac{1}{|\mathcal{D}|}\sum_{t_0\in\mathcal{D}}
 \subsection*{Что важно помнить при чтении}
 
 \begin{itemize}
-\item Ни одна из метрик не взвешена по площади ячейки ($\cos\varphi$): суммирование идёт по
-      узлам сетки равномерно, поэтому приполярные области представлены избыточно.
-\item В $\operatorname{ACC}$ среднее по полю не вычитается~--- это стандартное определение,
+\item Обе метрики взвешены по площади ячейки ($w_s\propto\cos\varphi_s$). Проверка показала,
+      что переход от невзвешенной версии к взвешенной практически не меняет структуру матриц:
+      корреляция внедиагональных элементов $r \approx 0.99$ для обеих моделей, суммарная
+      внедиагональная «масса» растёт на 1--4\,\%. То есть исправление нужно для соответствия
+      стандарту, а не потому, что оно меняет выводы.
+\item В $\operatorname{ACC}_w$ среднее по полю не вычитается~--- это стандартное определение,
       где роль «среднего» играет климатология $\bar c$.
-\item $S_{vu}$ нормирована на $\sigma$ \emph{столбца} $u$. Сравнение столбцов между собой
+\item $S_{vu}$ нормирована на $\sigma_w$ \emph{столбца} $u$. Сравнение столбцов между собой
       поэтому смещено в пользу малоизменчивых полей (приземный ветер); сравнение пары
       $v\!\to\!u$ против $u\!\to\!v$ от этого свободно, так как нормировки различаются.
-\item Это чувствительность к \emph{конечному} возмущению: поле целиком заменяется
-      климатологией, что далеко за пределами линейного режима. Это не локальный градиент.
-\item Возмущения у моделей не равны: у Aurora подменяются два входных снимка, у Pangu~---
-      один. Это следствие архитектур, а не выбора методики.
+\item Это чувствительность к \emph{конечному} возмущению (поле целиком заменяется
+      климатологией), далеко за пределами линейного режима, а не локальный градиент.
+\item Возмущения у моделей не равны: Aurora получает два входных снимка (подменяются оба),
+      Pangu~--- один. Это следствие архитектур, а не методики.
 \end{itemize}
 
 \end{document}
