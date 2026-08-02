@@ -143,52 +143,8 @@ df.to_pickle(os.path.join(DR_DIR, f'dose_matrix_{MODEL}.pkl'))
 n = df.date.nunique()
 print(f'{n} дат, {len(df)} строк', flush=True)
 
-TITLE = {'aurora': 'Aurora', 'pangu': 'Pangu-Weather', 'stormer': 'Stormer'}[MODEL]
-
-
-def draw(ax, mat, title, cmap, cbar_label, fmt='{:.3f}'):
-    v, lo = np.nanmax(mat), np.nanmin(mat)
-    im = ax.imshow(mat, cmap=cmap, vmin=lo, vmax=v, aspect='auto')
-    ax.set_xticks(range(len(NAMES))); ax.set_xticklabels(NAMES, rotation=90, fontsize=8)
-    ax.set_yticks(range(len(ALPHAS)))
-    ax.set_yticklabels([f'{PATCH}({a:g})' for a in ALPHAS], fontsize=9)
-    for e in GROUP_EDGES:
-        ax.axvline(e - 0.5, color='k', lw=0.6, alpha=0.5)
-    for i in range(mat.shape[0]):
-        for j in range(mat.shape[1]):
-            val = mat[i, j]
-            if np.isfinite(val):
-                rel = (val - lo) / (v - lo) if v > lo else 0.5
-                ax.text(j, i, fmt.format(val), ha='center', va='center', fontsize=6,
-                        color='white' if (rel > 0.65 or rel < 0.15) else 'black')
-    ax.set_title(title, fontsize=10)
-    cb = plt.colorbar(im, ax=ax, shrink=0.85, pad=0.015)
-    cb.set_label(cbar_label, fontsize=8)
-    cb.ax.tick_params(labelsize=7)
-
-
-fig, axes = plt.subplots(4, 1, figsize=(15, 16))
-for k, lead in enumerate(LEADS):
-    sub = df[df.lead == lead]
-    m_r = sub.groupby(['alpha', 'output'])['rmse_anom'].mean().unstack().reindex(
-        index=ALPHAS, columns=NAMES).values
-    m_a = sub.groupby(['alpha', 'output'])['acc'].mean().unstack().reindex(
-        index=ALPHAS, columns=NAMES).values
-    draw(axes[2 * k], m_r,
-         f'RMSE / $\\sigma_w$(аномалии), взвеш. по cos φ  —  {TITLE} +{lead}ч  (n={n} дат)',
-         'viridis', 'RMSE в долях СКО аномалии')
-    draw(axes[2 * k + 1], m_a,
-         f'ACC против правды отн. климатологии, взвеш.  —  {TITLE} +{lead}ч  (n={n} дат)',
-         'viridis', 'ACC')
-axes[-1].set_xlabel('поле прогноза', fontsize=10)
-fig.suptitle(f'{TITLE}: плавное замещение {PATCH} климатологией\n'
-             f'строка $\\alpha$: 0 = реальные данные, 1 = полная климатология.  '
-             f'RMSE нормирована на СКО аномалии (1.0 = уровень климатологического прогноза)',
-             fontsize=13, y=0.995)
-plt.tight_layout(rect=[0, 0, 1, 0.985])
-out = f'{FIG_DIR}/dose_matrix_{PATCH}_{MODEL}_n{n}.png'
-plt.savefig(out, dpi=150)
-print('saved', out, flush=True)
+# Рисование вынесено в plots/plot_dose_matrix.py, чтобы гамма и нормировка задавались
+# в одном месте и не расходились между запусками.
 
 print('\n=== рост RMSE/σ_аном относительно alpha=0 ===')
 for lead in LEADS:
