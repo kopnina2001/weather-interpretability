@@ -76,7 +76,7 @@ for lead in LEADS:
                  f'Нормировка на СКО аномалии: y = 1 — прогноз не лучше климатологии',
                  fontsize=12.5)
     plt.tight_layout(rect=[0, 0, 1, 0.935])
-    out = f'{FIG_DIR}/dose_panels_{PATCH}_lead{lead}_{MODEL}_n{n}.png'
+    out = f'{FIG_DIR}/dose_panels_anom_{PATCH}_lead{lead}_{MODEL}_n{n}.png'
     plt.savefig(out, dpi=150)
     plt.close(fig)
     print('saved', out, flush=True)

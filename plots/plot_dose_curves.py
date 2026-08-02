@@ -70,7 +70,7 @@ for lead in LEADS:
     ax.legend(fontsize=8.5, loc='upper left', title='поле (сырая RMSE при α=0 → α=1)',
               title_fontsize=8.5)
     plt.tight_layout()
-    out = f'{FIG_DIR}/dose_curves_{PATCH}_lead{lead}_{MODEL}_n{n}.png'
+    out = f'{FIG_DIR}/dose_curves_anom_{PATCH}_lead{lead}_{MODEL}_n{n}.png'
     plt.savefig(out, dpi=150)
     plt.close(fig)
     print('saved', out, flush=True)
