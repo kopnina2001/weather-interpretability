@@ -3,17 +3,17 @@
     plot_acc_strip.py [aurora|pangu|both]
 
 The full matrix (analysis/compute_19var_matrix.py) sets its colour scale from the strongest
-row, which is MSLP; the Z1000/Z850/Z500 rows end up nearly white and unreadable.  This script
-extracts those three rows and rescales the colour to them, so the figure can go into the text
-on its own.
+row, which is MSLP.  This script extracts the three geopotential rows so they can go into the
+text on their own, KEEPING that same scale, so the strip and its parent figure are directly
+comparable cell for cell.
 
 Same convention as the parent figure: rows = the patched input field, columns = the forecast
 field, values = ACC_w(patched) - ACC_w(baseline), diverging RdBu_r on a symmetric scale.
 
-The scale is set from the OFF-DIAGONAL cells only.  The self-effect cells (patch Z1000, look
-at Z1000) are an order of magnitude larger and would flatten everything else -- the whole
-point of the extraction.  They are allowed to saturate and get a black outline to mark that
-their colour is clipped; the printed number is still exact.
+The scale is v = max|dACC| over the FULL 19x19 matrix for that model and lead, exactly as the
+parent computes it.  Nothing is clipped, so no cell is outlined.  The trade-off is that the
+geopotential rows stay pale -- the MSLP row sets the limit -- so read the numbers, not the
+colour, when comparing weak cells.
 """
 import os
 import sys
@@ -70,15 +70,11 @@ def draw(ax, mat, title, v):
     cb.ax.tick_params(labelsize=8)
 
 
-def scale(mats):
-    """symmetric limit from the off-diagonal cells of all panels that share the colour bar"""
-    vals = []
-    for m in mats:
-        for i, r in enumerate(ROWS):
-            for j, c in enumerate(NAMES):
-                if c != r and np.isfinite(m[i, j]):
-                    vals.append(abs(m[i, j]))
-    return float(np.max(vals))
+def parent_scale(df, lead):
+    """the symmetric limit the full 19x19 figure uses: max|dACC| over every row"""
+    full = (df[df.lead == lead].groupby(['patched', 'output'])['dacc_w'].mean()
+            .unstack().reindex(index=NAMES, columns=NAMES).values)
+    return float(np.nanmax(np.abs(full)))
 
 
 data = {m: pd.read_pickle(p) for m, p in PKL.items()
@@ -88,14 +84,12 @@ print({m: f'{k} дат' for m, k in n.items()}, flush=True)
 
 # one figure per model, both leads stacked
 for m, df in data.items():
-    mats = [matrix(df, L) for L in LEADS]
-    v = scale(mats)
     fig, axes = plt.subplots(2, 1, figsize=(14, 5.4))
-    for ax, L, mat in zip(axes, LEADS, mats):
-        draw(ax, mat, f'{TITLE[m]}  +{L}ч   (n={n[m]} дат)', v)
+    for ax, L in zip(axes, LEADS):
+        draw(ax, matrix(df, L), f'{TITLE[m]}  +{L}ч   (n={n[m]} дат)', parent_scale(df, L))
     axes[-1].set_xlabel('поле прогноза', fontsize=10)
     fig.suptitle(f'{TITLE[m]}: падение ACC при подмене геопотенциала на климатологию\n'
-                 f'шкала задана по недиагональным ячейкам; ячейки в рамке выходят за неё',
+                 f'шкала та же, что у полной матрицы 19×19 (её задаёт строка MSLP)',
                  fontsize=12)
     plt.tight_layout(rect=[0, 0, 1, 0.90])
     out = f'{FIG_DIR}/acc_strip_Z_{m}_n{n[m]}.png'
@@ -105,15 +99,15 @@ for m, df in data.items():
 
 # combined: both models, both leads, one shared scale
 if len(data) == 2:
-    panels = [(m, L, matrix(data[m], L)) for m in ('aurora', 'pangu') for L in LEADS]
-    v = scale([p[2] for p in panels])
+    panels = [(m, L) for m in ('aurora', 'pangu') for L in LEADS]
     fig, axes = plt.subplots(4, 1, figsize=(14, 10.2))
-    for ax, (m, L, mat) in zip(axes, panels):
-        draw(ax, mat, f'{TITLE[m]}  +{L}ч   (n={n[m]} дат)', v)
+    for ax, (m, L) in zip(axes, panels):
+        draw(ax, matrix(data[m], L), f'{TITLE[m]}  +{L}ч   (n={n[m]} дат)',
+             parent_scale(data[m], L))
     axes[-1].set_xlabel('поле прогноза', fontsize=10)
     fig.suptitle('Падение ACC при подмене геопотенциала на климатологию: Aurora против '
-                 'Pangu-Weather\nобщая шкала у всех четырёх панелей, задана по '
-                 'недиагональным ячейкам', fontsize=12.5)
+                 'Pangu-Weather\nу каждой панели шкала своей полной матрицы 19×19 — '
+                 'сравнивать по числам, не по цвету', fontsize=12.5)
     plt.tight_layout(rect=[0, 0, 1, 0.945])
     out = f'{FIG_DIR}/acc_strip_Z_both_n48.png'
     plt.savefig(out, dpi=160)
