@@ -1,106 +1,211 @@
 # Weather Model Interpretability
 
-Исследование методов интерпретируемости для transformer-based AI-моделей погоды на кластере "Летний кластер AIRI". Кейс: тайфун Bebinca (Китай, сентябрь 2024) и спокойный контроль (ноябрь 2024).
+Интерпретируемость transformer-based AI-моделей погоды (Aurora, Pangu-Weather, Stormer).
+Кластер «Летний кластер AIRI», 4× V100 32GB.
 
-## Кластер
+Основной результат проекта — **причинная карта влияний между входными и выходными полями**,
+полученная подменой входных полей на климатологию, и **закон роста ошибки** при плавном
+переходе от реальных данных к климатологии.
 
-- 4× NVIDIA Tesla V100-SXM3-32GB (32GB VRAM каждая)
-- 16 vCPU Intel Xeon (Skylake, IBRS)
-- 251 GiB RAM, 2.1TB свободного диска
-- Ubuntu 22.04.5 LTS, kernel 5.15
-- CDS API уже настроен (`~/.cdsapirc`) — доступен прямой доступ к ERA5 через Copernicus CDS, в дополнение к ARCO ERA5
+---
+
+## Структура репозитория
+
+```
+├── notebooks/          интерактивный анализ (jupytext percent-format .py)
+├── experiments/        прогоны моделей, пишут в results/
+│   ├── campaign/         2-летние верификационные кампании (Aurora/Pangu/Stormer)
+│   ├── patching/         подмена входных полей на климатологию, 19 переменных
+│   ├── dose_response/    линейный блендинг real ↔ климатология
+│   └── data/             скачивание ERA5, отбор дат и центров штормов
+├── analysis/           results/ → метрики (RMSE, ACC, матрицы)
+├── plots/              метрики → картинки
+├── figures/            готовые картинки, по темам
+├── report/             отчёты и методические заметки (LaTeX + PDF)
+├── results →           симлинк на /srv/exw/runs/… (в git не лежит)
+├── data →              симлинк на /srv/exw/data/… (в git не лежит)
+└── legacy/             отложенные ветки исследования, ничего не удалено
+```
+
+`.py` вместо `.ipynb` — чтобы diff читался в git. Открываются как ноутбуки через jupytext
+(`jupytext --to ipynb notebooks/climatology.py`), ячейки размечены `# %%`.
+Оригинальные `.ipynb` с сохранёнными выводами лежат в `legacy/notebooks/`.
+
+---
+
+## Данные
+
+**ARCO ERA5** — ground truth:
+```python
+ds = xr.open_zarr('gs://gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3',
+                  storage_options=dict(token='anon'))
+```
+Кэш на 2 года (2024–2025, 6-часовой): `/srv/exw/data/irina_weather_interpretability/era5_2024_2025_6h_{surface,upper}.zarr`
+
+**WeatherBench-2 climatology** (day-of-year × hour-of-day, 1990–2019):
+```python
+ds = xr.open_zarr('gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr',
+                  storage_options=dict(token='anon'))
+```
+Кэш: `climatology_1990-2019_{surface,upper_500_850_1000}.zarr`.
+**Важно**: для upper-air скачаны только уровни 500/850/1000 гПа — полный набор из 13 уровней
+не помещался. Все эксперименты с климатологией ограничены этими тремя уровнями.
+
+`chunks=None` в `xr.open_zarr()` — критично, иначе dask даёт OOM на больших срезах.
+
+### Поля
+19 переменных: 4 приземных (MSLP, U10, V10, T2M) + 5 upper-air (Z, Q, T, U, V)
+на 1000/850/500 гПа.
+
+Z — **сырой геопотенциал Φ в м²/с²**, не геопотенциальная высота (делить на g₀ = 9.80665
+для получения гпм). RMSE и ACC инвариантны к этому множителю.
+
+---
 
 ## Модели
 
-| Модель | Архитектура | Разрешение | Формат | Статус в проекте |
+| Модель | Архитектура | Разрешение | Формат | Особенность |
 |---|---|---|---|---|
-| Pangu-Weather | 3D Earth-Specific Transformer | 0.25°, 13 pressure levels | ONNX | verification campaign (96 init), occlusion saliency (notebook 02) |
-| Aurora | Perceiver-encoder + 3D Swin Transformer U-Net backbone | 0.25° | PyTorch | полный набор экспериментов: campaign, error maps, input patching, skeleton/tensor decomposition |
-| Stormer | плоский ViT (24 identical transformer blocks) | 1.40625° (грубая), нормализованное пространство | PyTorch | verification campaign, skeleton decomposition, input patching |
-| GraphCast | GNN | — | — | вне scope — не transformer-архитектура |
+| Aurora (1.3B) | Perceiver3D encoder + Swin3D U-Net | 0.25°, 13 уровней | PyTorch | 2 входных таймстепа, обрезает сетку до 720 широт |
+| Pangu-Weather (256M) | 3D Earth-Specific Transformer | 0.25°, 13 уровней | ONNX | 1 таймстеп, 721 широта, уровни в **убывающем** порядке |
+| Stormer | плоский ViT, 24 блока | 1.40625° | PyTorch | нормализованное пространство |
 
-## Входные поля
+GraphCast — вне scope, не transformer.
 
-- Поверхность: MSLP, 10m U/V wind, 2m temperature
-- Верхние уровни: geopotential, specific humidity, temperature, u/v wind на 13 уровнях давления: 1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50 гПа
-- Статика (Aurora): lsm, slt, z (орография)
+### Пределы Aurora на одной V100 32GB (установлено экспериментально)
+- `batch=2` → OOM (нужно 6.4 ГБ сверх доступных 31.7). Потолок — batch=1.
+- Градиенты → OOM даже с `model.configure_activation_checkpointing()`: forward влезает
+  в 19.9 ГБ, но backward запрашивает ещё 15.8 при 11.8 свободных. Нужна карта ≥48 ГБ.
+  Поэтому вместо градиентных методов используется подмена входов (см. ниже).
 
-## Источники данных
+### Три нюанса, из-за которых `aurora.rollout()` не работает напрямую
+1. **`Metadata.time` — один элемент, не по одному на входной таймстеп.** Тензоры требуют
+   2 времени (t−6ч и t), но `metadata.time` всегда 1-кортеж. Передача 2-элементного
+   не бросает ошибку, а тихо задирает память до OOM на многошаговом rollout.
+2. **`aurora.rollout()` даёт ~8 ГБ лишнего overhead** против прямого `model.forward()`.
+   Обход: ручной rollout через `model.forward()` + `aurora.rollout._advance_batch()`.
+3. **Выходная сетка 720 широт, не 721** — модель срезает южный полюс. Нужен
+   `batch.crop(model.patch_size)` один раз перед циклом, иначе `_advance_batch` падает.
 
-**ARCO ERA5** (сырые поля, ground truth):
-```python
-import xarray as xr
-ds = xr.open_zarr(
-    'gs://gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3',
-    storage_options=dict(token='anon'))
+С `torch.autocast('cuda', dtype=torch.float16)` (не `model.half()` — ломает проверку
+на `lat`/`lon`, они должны остаться fp32) — стабильно 19.6 ГБ на шаг.
+
+---
+
+## Методы и результаты
+
+### 1. Верификационная кампания
+`experiments/campaign/` → `notebooks/model_comparison_*.py`, `notebooks/climatology.py`
+
+96 инициализаций (2024–2025, 4/месяц) × 3 модели × 8 лидов (6–48ч).
+Метрики: RMSE, ACC против WB2-климатологии, bias, variance ratio, спектры.
+Карты ошибок для синоптических кейсов (тайфун Bebinca, Китай), включая сравнение
+с климатологическим baseline.
+
+Картинки: `figures/model_comparison/`, `figures/climatology/`, `figures/data_overview/`
+
+### 2. Матрица влияний: подмена входа на климатологию
+`experiments/patching/` → `analysis/compute_19var_matrix.py` → `figures/patching_matrices/`
+
+Причинная абляция: подменить **одно** входное поле на климатологию, измерить, как
+испортились все 19 выходных. 48 дат 2024 года (дни 4/11/18/25, часы 00/06/12/18),
+леды +6ч и +24ч. Даёт матрицу 19×19 — прокси для якобиана без градиентов.
+
+**Находки:**
+- Матрица сильно **асимметрична**: Z → ветер в 8–20 раз сильнее обратного,
+  Z500 → Q500 до 126 раз.
+- **Z500 слабо влияет сам на себя** — модель восстанавливает его из других полей.
+  **MSLP, наоборот, незаменим** — несёт уникальную информацию.
+- Aurora и Pangu структурно согласуются (r = 0.913), но у Pangu приземные self-effects
+  в 2.6–4 раза выше, а урон по картам вдвое больше и гораздо менее локализован.
+
+### 3. Dose-response: закон роста ошибки
+`experiments/dose_response/` → `analysis/analyse_dose_z1000.py` → `plots/plot_dose_panels*.py`
+
+Вместо бинарной подмены — плавный переход:
+
+    x_α = (1 − α)·x_real + α·c_clim ,   α ∈ {0, 0.2, 0.4, 0.6, 0.8, 1}
+
+Подменяется Z1000, те же 48 дат. Отвечает на вопрос, законен ли бинарный эксперимент
+как прокси градиента.
+
+**Находки:**
+- Кривая **слегка выпуклая**, насыщения нет → бинарная матрица оправдана как прокси.
+  Нормированная RMSE ×2.37 при +6ч и ×1.39 при +24ч.
+- Сильнее всего страдает **термодинамика, не ветер**: T1000 (k = 0.69), Q1000, T2M.
+  При α = 1 ошибка T1000 достигает 0.81 СКО аномалии — прогноз почти теряет скилл.
+- Физически: Z1000 ≈ приземное давление, связано с T гипсометрически напрямую;
+  ветер восстанавливается из геострофического баланса по другим уровням.
+
+### 4. Bias maps
+`plots/plot_bias_map.py` (одна дата), `plots/composite_bias_maps.py` (композит) →
+`figures/bias_maps/`
+
+Попиксельно: |ошибка| baseline vs подменённого прогона, разность локализует урон.
+Композит — временная RMSE по 48 датам в каждом узле сетки отдельно (поэтому cos φ
+не входит: по глобусу ничего не агрегируется).
+
+При α = 1, +6ч: T1000 хуже на 100% узлов (RMSE ×6.02), Q1000 ×2.92, U/V1000 ×2.7.
+Урон глобальный, максимум в шторм-треках средних широт обоих полушарий.
+
+---
+
+## Метрики
+
+Все пространственные метрики взвешены по площади ячейки, `w = cos φ / Σ cos φ`
+(конвенция WeatherBench-2 / ECMWF):
+
 ```
-Кэш на 2 года (2024-2025, 6-часовой) — `/srv/exw/data/irina_weather_interpretability/era5_2024_2025_6h_{surface,upper}.zarr`.
-
-**WeatherBench2 climatology** (precomputed, day-of-year × hour-of-day, 1990-2019):
-```python
-ds = xr.open_zarr('gs://weatherbench2/datasets/era5-hourly-climatology/1990-2019_6h_1440x721.zarr',
-                   storage_options=dict(token='anon'))
+RMSE_w = sqrt( Σ_s w_s (a_s − b_s)² )
+σ_w(x) = sqrt( Σ_s w_s (x_s − Σ w x)² )
+ACC_w  = Σ w·a'·b' / sqrt( Σ w·a'² · Σ w·b'² ),   a' = pred − clim,  b' = truth − clim
 ```
-Кэш — `climatology_1990-2019_{surface,upper_500_850_1000}.zarr`. **Важно**: climatology для upper-air переменных скачана только на 3 уровня (500/850/1000 hPa) из 13 — любой эксперимент, патчащий upper-air переменную климатологией, patch-ит только эти 3 уровня (partial-column), остальные 10 остаются реальными данными. Это задокументировано в каждом релевантном скрипте/ноутбуке.
 
-`chunks=None` в `xr.open_zarr()` — критично для избежания dask-related OOM при работе с большими срезами.
+**Нормировка RMSE — важная тонкость.** Делить можно на два разных СКО:
 
-## Реализованные методы и находки
+| знаменатель | смысл | опорная точка |
+|---|---|---|
+| σ(правда) | пространственный разброс всего поля | нет |
+| σ(аномалии) = σ(правда − клим) | разброс того, что реально надо предсказать | **y = 1 — прогноз не лучше климатологии** |
 
-### 1. Верификационная кампания (notebooks 01-06)
-96 инициализаций (2024-2025, 4/месяц) × 3 модели × 8 lead times (6-48h). Метрики: RMSE, ACC (precise WB2 climatology), bias, variance ratio, corr-with-climatology, zonal power spectrum. Прогнозы кэшированы (`results/campaign_*_predictions/`), метрики пересчитываются без перезапуска моделей.
+Отношение σ(правда)/σ(аномалии) меняется от 1.0 (V500 — климатологическое среднее
+меридионального ветра ≈ 0) до 5.8 (T2M — доминирует градиент экватор–полюс). Поэтому
+нормировка на σ(правда) систематически занижает термодинамические поля относительно
+ветра, и топ-5 самых чувствительных полей меняется полностью
+(корреляция рангов 0.75 при +6ч, 0.55 при +24ч).
 
-### 2. Error maps для конкретного кейса (notebook 06, script `plot_china_error_maps.py`)
-Тайфун Bebinca, zoom на Китай: MSLP + Z@850hPa error maps (pred−truth), включая climatology-mean baseline для сравнения (модели ~5x лучше naive climatology в зоне шторма).
+**Корректнее σ(аномалии)** — у неё есть опорная точка. См. `analysis/compare_sigma.py`,
+обе версии картинок сохранены для сравнения.
 
-### 3. Skeleton (interpolative) decomposition — notebook 07
-Вместо SVD/PCA (абстрактные eigenvectors) — `scipy.linalg.interpolative.interp_decomp`: выбирает k **реальных** точек сетки (landmarks) / каналов, через которые восстанавливается всё hidden state. Применено к backbone Aurora (3 encoder stage) и Stormer (24 flat ViT blocks, hook на shallow/middle/deep).
+Полный вывод формул — `report/metrics_methodology.pdf`.
 
-**Главная находка**: landmarks кластеризуются на центре тайфуна (850hPa vorticity extremum) — подтверждено quiet-baseline контролем (15 ноября, без шторма — landmarks не кластеризуются на сопоставимом экстремуме). Воспроизведено на **двух архитектурно разных моделях** (Aurora Swin U-Net, Stormer flat ViT).
+---
 
-Попытка того же метода на attention-матрицах (вместо hidden state) дала **negative result**: landmarks садятся на края/углы окна независимо от данных — артефакт rank-revealing QR, подтверждено тем же quiet-контролем.
+## legacy/
 
-### 4. Input-level climatological patching — notebook 08 (+ `_stormer` вариант)
-Причинная абляция: заменить ОДНУ input-компоненту (surface_mslp / wind / mass_field / temperature / t2m) на climatology mean, оставить остальное реальным, прогнать полный rollout, сравнить с baseline. Два scope (global/regional), 4 метрики (RMSE vs baseline, ΔRMSE vs truth, ΔACC, relative sensitivity) + 2 взвешенные (area-weighted, storm-focused Gaussian на MSLP-min track).
+Отложенные ветки. Ничего не удалено — код рабочий, результаты воспроизводимы.
 
-**Находка**: wind/mass_field патчи сильнее всего портят Z-поля (mass-wind balance); MSLP имеет непропорционально широкое кросс-влияние для одной 2D-переменной.
+| папка | что |
+|---|---|
+| `notebooks/` | оригинальные `.ipynb` со всеми выводами + конвертации отложенных |
+| `skeleton/` | interpolative (skeleton) decomposition hidden state и attention |
+| `tensor/` | Tucker, NMF, CKA, RepE-style PCA |
+| `saliency/` | occlusion saliency на Pangu |
+| `tests/` | отладочные прогоны |
+| `v1/` | первые версии кампаний, вытесненные `*_v2` (в v2 добавлены bias, variance ratio, сохранение полей) |
 
-### 5. Matrix/tensor decomposition для redundancy heads/layers — notebook 09
-- **Spectrum/effective rank** (SVD hidden state) — negative result: storm/quiet почти идентичны, сжимаемость структурна, не event-driven.
-- **CKA** между attention heads — positive: heads менее избыточны/более специализированы при реальном шторме.
-- **Tucker decomposition** (heads, query, key) тензора — независимо подтверждает CKA строгим численным методом.
-- **RepE-style PCA** на разнице storm−quiet hidden state — negative result: главная компонента оказалась сезонным confound (Sept vs Nov), не сигналом шторма — методологический урок (нужны contrastive пары в одном сезоне, или reuse patching-инфраструктуры вместо двух разных дат).
-- **NMF** на attention-весах — чище структура, чем skeleton decomposition на том же объекте, но архитектурное свойство (одинаково у storm/quiet), не storm-specific.
+**Честные negative results** этой ветки задокументированы наравне с позитивными:
+- skeleton на **hidden state**: landmarks садятся на центр тайфуна (850 гПа vorticity
+  extremum) — **выжило** после quiet-baseline контроля, подтверждено на второй
+  архитектуре (Stormer), знаковый тест p = 0.031 по 6 штормам с парными контролями.
+- skeleton на **attention**: landmarks садятся на края домена — артефакт выбора столбцов
+  в QR, а не физика. Отброшено.
+- **RepE-PCA** на разнице storm−quiet: главная компонента оказалась сезонным конфаундом.
+- **spectrum / effective rank**: storm и quiet почти неразличимы.
+- **NMF** на attention: структура чище, чем у skeleton, но свойство архитектурное,
+  а не storm-specific.
 
-## Ноутбуки
-
-- `01_era5_visualization.ipynb` — визуализация синоптических кейсов из ARCO ERA5
-- `02_saliency_experiment.ipynb` — occlusion saliency на Pangu-Weather
-- `03_output_correlation.ipynb` — корреляционная матрица выходов модели
-- `04_aurora_vs_pangu.ipynb` — baseline-сравнение Aurora vs Pangu-Weather
-- `05_model_comparison.ipynb` — сравнение всех трёх моделей
-- `06_climatology_correlation.ipynb` — verification campaign метрики (RMSE/ACC/bias/variance ratio/spectral), error maps для тайфуна Bebinca
-- `07_skeleton_decomposition.ipynb` — skeleton decomposition hidden state (Aurora + Stormer), attention negative result, quiet-baseline контроль
-- `08_input_patching.ipynb` / `08_input_patching_stormer.ipynb` — causal input-level climatological patching
-- `09_tensor_decomposition.ipynb` — spectrum/effective rank, CKA, Tucker, RepE-PCA, NMF
-
-## Aurora — важные находки (см. `run_case_aurora.py`)
-
-Три нюанса, из-за которых прямое использование `aurora.rollout()` не работало на одной V100 (32GB):
-
-1. **`Metadata.time` — один элемент, не по одному на каждый входной таймстеп.** Aurora требует 2 входных
-   времени (t-6h и t) в тензорах, но `metadata.time` — всегда 1-кортеж (текущее/референсное время). Передача
-   2-элементного кортежа не бросает ошибку, но задирает потребление памяти на многошаговом rollout до OOM —
-   баг тихий, трудно диагностируемый.
-2. **`aurora.rollout()` сама по себе даёт лишний memory overhead** (~8GB) относительно прямого вызова
-   `model.forward()` — вероятно, из-за повторного `batch_transform_hook`/`type`/`crop`/`to(device)` на каждом
-   шаге. Обошли: ручной 4-шаговый rollout, вызывая `model.forward()` напрямую и продвигая batch через
-   `aurora.rollout._advance_batch()` (тот же helper, что использует сама `rollout()`).
-3. **Выходная сетка — 720 широт, не 721** (модель обрезает южный полюс, -90°). Нужно один раз обрезать входной
-   batch через `batch.crop(model.patch_size)` перед циклом, иначе `_advance_batch` падает на несовпадении shape.
-
-С `torch.autocast('cuda', dtype=torch.float16)` (не `model.half()` — ломает числовую проверку на `lat`/`lon`,
-которые должны остаться fp32) — стабильно **19.6GB на шаг**, 4 шага (24h) укладываются с большим запасом.
+---
 
 ## Окружение
 
@@ -110,47 +215,53 @@ source ~/venv/bin/activate
 pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu126
 ```
 
-**Важно для GPU**: `onnxruntime-gpu` не находит CUDA-библиотеки сам по себе — нужно указать `LD_LIBRARY_PATH` на
-CUDA-либы, которые уже устанавливает `torch` (отдельный system CUDA toolkit не нужен). Добавить в конец
-`~/venv/bin/activate`:
+**GPU + ONNX**: `onnxruntime-gpu` не находит CUDA-библиотеки сам. Добавить в конец
+`~/venv/bin/activate` (именно туда — переменная, выставленная после старта Python,
+не подхватывается):
 
 ```bash
-export LD_LIBRARY_PATH=$(find "$VIRTUAL_ENV/lib/python3.10/site-packages/nvidia" -maxdepth 2 -type d -name lib 2>/dev/null | paste -sd: -):$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$(find "$VIRTUAL_ENV/lib/python3.10/site-packages/nvidia" \
+  -maxdepth 2 -type d -name lib 2>/dev/null | tr '\n' ':')$LD_LIBRARY_PATH
 ```
 
-(env-переменная, установленная уже ПОСЛЕ старта Python-процесса, не подхватывается — это должно быть именно в
-`activate`, а не в коде ноутбука после `import onnxruntime`.)
+Отдельный system CUDA toolkit не нужен — библиотеки ставит `torch`.
 
-## Совместный доступ (shared filesystem `/srv/exw`)
+---
 
-Тяжёлые артефакты (веса модели, входные данные, результаты прогонов) не лежат в git — они в общей папке `/srv/exw`,
-следуя существующей конвенции команды (`<username>_<project>` для `data/`/`runs/`, без префикса для переиспользуемых
-весов в `checkpoints/`):
+## Общая файловая система `/srv/exw`
 
-- `/srv/exw/checkpoints/pangu_weather_{6,24}/pangu_weather_{6,24}.onnx` — веса модели (общие, не per-project)
-- `/srv/exw/data/irina_weather_interpretability/` — входные данные (ERA5 2024-2025, WB2 climatology)
-- Результаты прогонов (`results/*`) — в `.gitignore`, живут только на диске (не в git), пересчитываются скриптами при необходимости
+Тяжёлые артефакты не в git, конвенция команды — `<username>_<project>`:
 
-Симлинки `data` и `results` закоммичены в git (git symlink, mode 120000) — восстанавливаются автоматически при
-`git clone`. Только `model_weights/` — сама папка в `.gitignore`, её нужно собрать руками один раз:
+- `/srv/exw/checkpoints/pangu_weather_{6,24}/…onnx` — веса (общие, без префикса)
+- `/srv/exw/data/irina_weather_interpretability/` — ERA5 + климатология
+- `/srv/exw/runs/irina_weather_interpretability/` — результаты прогонов
+
+Симлинки `data` и `results` закоммичены (git mode 120000), восстанавливаются при clone.
+`model_weights/` в `.gitignore`, собрать руками один раз:
 
 ```bash
-cd weather-interpretability
 mkdir -p model_weights
-ln -s /srv/exw/checkpoints/pangu_weather_6/pangu_weather_6.onnx model_weights/pangu_weather_6.onnx
-ln -s /srv/exw/checkpoints/pangu_weather_24/pangu_weather_24.onnx model_weights/pangu_weather_24.onnx
+ln -s /srv/exw/checkpoints/pangu_weather_6/pangu_weather_6.onnx model_weights/
+ln -s /srv/exw/checkpoints/pangu_weather_24/pangu_weather_24.onnx model_weights/
 ```
 
-## Workflow: ветки
+**Дисциплина по месту**: диск переполнялся один раз, положив 4 GPU-воркера и повредив
+4 npz. Скрипты пишут атомарно (`.tmp` + `os.replace`), проверяют точное число массивов
+в файле при чтении и умеют продолжать с места обрыва. `results/patching/` — 200 ГБ,
+следить за `df -h`.
 
-**В `main` пишет только владелец репозитория.** Остальные — через собственную ветку и Pull Request:
+---
+
+## Workflow
+
+**В `main` пишет только владелец репозитория.** Остальные — через ветку и PR:
 
 ```bash
 git checkout -b <имя>/<фича>
-# ... изменения, коммиты ...
 git push -u origin <имя>/<фича>
-# затем открыть PR в main на GitHub
 ```
+
+---
 
 ## Ссылки
 
@@ -159,19 +270,8 @@ git push -u origin <имя>/<фича>
 - Stormer: https://github.com/tung-nd/stormer
 - ARCO ERA5: https://github.com/google-research/arco-era5
 - WeatherBench2: https://github.com/google-research/weatherbench2
-- Advection Heads in an Atmosphere Foundation Model (attention analysis в Aurora, референс для notebook 07/09): https://arxiv.org/abs/2508.00969
+- Advection Heads in an Atmosphere Foundation Model — референс для `legacy/skeleton`
 - Representation Engineering (RepE): https://arxiv.org/abs/2310.01405
-- CKA (Kornblith et al. 2019, Similarity of Neural Network Representations Revisited): https://arxiv.org/abs/1905.00414
-- DEIM (Chaturantabut & Sørensen 2010) — sensor-placement предок skeleton-decomposition подхода
-- Interpretable ML for Weather and Climate Prediction (Survey): https://arxiv.org/pdf/2403.18864
-
-## Статус
-
-Все 9 ноутбуков реализованы. Verification campaign завершена (96 init × 3 модели). Skeleton decomposition, input
-patching и tensor/matrix decomposition эксперименты выполнены для Aurora, input patching и skeleton decomposition
-— также для Stormer (независимое подтверждение находки про центр шторма на второй архитектуре). Pangu-Weather пока
-только в verification campaign и occlusion saliency — input patching и hidden-state интерпретация для Pangu (ONNX,
-нет прямого доступа к промежуточным активациям) остаются as future work.
-
-Честные negative results задокументированы наравне с позитивными (attention-skeleton edge-artifact, RepE seasonal
-confound, NMF архитектурное а не storm-specific свойство) — часть научной строгости методологии, не пробелы.
+- CKA, Kornblith et al. 2019: https://arxiv.org/abs/1905.00414
+- DEIM (Chaturantabut & Sørensen 2010) — предок skeleton-подхода, sensor placement
+- Interpretable ML for Weather and Climate Prediction (survey): https://arxiv.org/pdf/2403.18864
