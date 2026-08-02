@@ -49,7 +49,8 @@ def draw(ax, mat, title, v):
     im = ax.imshow(mat, cmap='RdBu_r', vmin=-v, vmax=v, aspect='auto')
     ax.set_xticks(range(len(NAMES))); ax.set_xticklabels(NAMES, rotation=90, fontsize=9)
     ax.set_yticks(range(len(ROWS)))
-    ax.set_yticklabels([f'подменён {r}' for r in ROWS], fontsize=10)
+    ax.set_yticklabels(ROWS, fontsize=9)          # plain names, as in the parent matrix
+    ax.set_ylabel('подменённое поле', fontsize=9)
     for e in GROUP_EDGES:
         ax.axvline(e - 0.5, color='k', lw=0.7, alpha=0.5)
     for i, r in enumerate(ROWS):
