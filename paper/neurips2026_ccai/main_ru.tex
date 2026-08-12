@@ -65,43 +65,49 @@ ERA5 задает начальные состояния и цели верифи
 \resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
   every node/.style={font=\scriptsize,align=center},
-  box/.style={rounded corners=3pt,minimum height=0.92cm,inner sep=5pt,line width=0.75pt},
-  source/.style={box,draw=inkblue,fill=datablue,minimum width=2.25cm},
-  patch/.style={box,draw=warmline,fill=climorange,minimum width=3.05cm},
-  model/.style={box,draw=green!45!black,fill=modelgreen,minimum width=2.15cm},
-  forecast/.style={box,draw=violet!55!black,fill=resultpurple,minimum width=1.95cm},
-  compare/.style={box,draw=inkblue,fill=metricblue,text width=4.10cm,minimum height=2.50cm},
-  result/.style={box,draw=violet!55!black,fill=resultpurple,text width=3.45cm,minimum height=2.50cm},
-  flow/.style={-{Latex[length=2.2mm,width=1.45mm]},draw=black!62,line width=0.8pt,rounded corners=2pt},
-  patchflow/.style={flow,draw=warmline},
-  guide/.style={font=\tiny\bfseries,anchor=west,inner sep=0pt}
+  stage/.style={rounded corners=4pt,minimum height=3.35cm,inner xsep=8pt,
+    inner ysep=7pt,line width=0.85pt},
+  intervention/.style={stage,draw=warmline,fill=climorange,text width=3.45cm},
+  rollouts/.style={stage,draw=green!45!black,fill=modelgreen,text width=4.10cm},
+  readouts/.style={stage,draw=inkblue,fill=metricblue,text width=3.45cm},
+  evidence/.style={stage,draw=violet!55!black,fill=resultpurple,text width=3.35cm},
+  flow/.style={-{Stealth[length=2.4mm,width=1.65mm]},draw=inkblue!80,
+    line width=0.95pt,shorten <=1pt,shorten >=1pt}
 ]
-  \node[guide,text=inkblue] at (-1.15,1.85) {БАЗОВАЯ ВЕТВЬ};
-  \node[guide,text=warmline] at (-1.15,-0.25) {КОНТРОЛИРУЕМАЯ ЗАМЕНА};
-  \node[source] (x) at (0,1.15) {состояние ERA5 $\mathbf{x}(t)$\\19 полей};
-  \node[source] (c) at (0,-1.15) {климатология WB2 $c_v(d,h)$\\тот же сезон и час UTC};
-  \node[patch] (p) at (3.05,-1.15) {меняется только поле $v$\\$x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\$\alpha=0,.2,\ldots,1$};
-  \node[model] (mb) at (5.85,1.15) {фиксированная $f_\theta$\\базовый прогноз};
-  \node[model] (mp) at (5.85,-1.15) {та же $f_\theta$\\прогноз с заменой};
-  \node[forecast] (yb) at (8.30,1.15) {$\hat y_u^{(0)}$\\+6 ч, +24 ч};
-  \node[forecast] (yp) at (8.30,-1.15) {$\hat y_u^{(v,\alpha)}$\\+6 ч, +24 ч};
-  \node[compare] (cmp) at (12.00,0) {\textbf{парное сравнение}\\та же дата, модель и срок\\[3pt]
-    $S_{vu}$: отклонение прогноза\\
-    $\Delta\acc_{vu}$: изменение качества относительно ERA5};
-  \node[result] (r) at (17.15,0) {матрицы $19\!\times\!19$ для $S$ и $\Delta\acc$\\дозовые кривые\\пространственные и широтные профили};
-  \coordinate (cmpWtop) at ([yshift=1.15cm]cmp.west);
-  \coordinate (cmpWbottom) at ([yshift=-1.15cm]cmp.west);
-  \draw[flow] (x.east) -- (mb.west);
-  \draw[patchflow] (x.south) -- ++(0,-0.25) -| (p.north);
-  \draw[patchflow] (c.east) -- (p.west);
-  \draw[flow] (mb.east) -- (yb.west);
-  \draw[patchflow] (p.east) -- (mp.west);
-  \draw[patchflow] (mp.east) -- (yp.west);
-  \draw[flow] (yb.east) -- (cmpWtop);
-  \draw[patchflow] (yp.east) -- (cmpWbottom);
-  \draw[flow] (cmp.east) -- (r.west);
+  \node[intervention] (input) at (0,0) {%
+    {\sffamily\bfseries\color{warmline}1\quad ВХОДНАЯ ЗАМЕНА}\\[6pt]
+    выбирается одно из 19 полей $v$\\[2pt]
+    $x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\[2pt]
+    $c_v$: климатология для тех же дня и часа\\
+    $\alpha=0,.2,\ldots,1$; остальные 18 полей фиксированы};
+
+  \node[rollouts,right=8mm of input] (roll) {%
+    {\sffamily\bfseries\color{green!38!black}2\quad ПАРНЫЕ ПРОГОНЫ}\\[7pt]
+    $\mathbf{x}(t)\ \xrightarrow{\quad f_\theta\quad}\ \hat{\mathbf y}^{(0)}(t+\tau)$\\[7pt]
+    $\mathbf{x}^{(v,\alpha)}(t)\ \xrightarrow{\ \text{та же}\ f_\theta\ }\
+      \ \hat{\mathbf y}^{(v,\alpha)}(t+\tau)$\\[6pt]
+    фиксированные веса; те же дата и срок $\tau$};
+
+  \node[readouts,right=8mm of roll] (measure) {%
+    {\sffamily\bfseries\color{inkblue}3\quad ДВА ПОКАЗАТЕЛЯ}\\[7pt]
+    $S_{vu}$\\[-1pt]
+    отклонение от базового прогноза\\[6pt]
+    $\Delta\acc_{vu}$\\[-1pt]
+    изменение качества по ERA5\\[5pt]
+    взвешивание по площади; $\tau=6,24$ ч};
+
+  \node[evidence,right=8mm of measure] (output) {%
+    {\sffamily\bfseries\color{violet!60!black}4\quad АГРЕГАЦИЯ}\\[7pt]
+    направленные матрицы $19\!\times\!19$\\[4pt]
+    дозовые кривые\\[4pt]
+    пространственные карты ошибок\\[4pt]
+    профили широт для отдельных полей};
+
+  \draw[flow] (input.east) -- (roll.west);
+  \draw[flow] (roll.east) -- (measure.west);
+  \draw[flow] (measure.east) -- (output.west);
 \end{tikzpicture}}
-\caption{Парный интервенционный аудит. Одно входное поле смешивается с согласованной климатологией; дата, веса модели и остальные 18 полей не меняются. Сравнение двух прогонов разделяет отклонение от базового прогноза $S$ и изменение качества по аномалиям $\Delta\acc$. Повторение по парам полей, дозам и узлам сетки дает направленные матрицы, дозовые кривые и пространственные профили.}
+\caption{Парный интервенционный аудит. Согласованное по сезону и часу возмущение проходит через ту же фиксированную модель, что и исходное состояние. Пара прогнозов дает два разных показателя: отклонение от базового прогона $S$ и изменение качества по аномалиям $\Delta\acc$. Повторение по входам, выходам и дозам дает направленные матрицы и пространственные сводки.}
 \label{fig:method}
 \end{figure}
 

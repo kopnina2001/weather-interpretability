@@ -55,43 +55,49 @@ ERA5 provides initial states and verification truth~\citep{hersbach2020era5}; We
 \resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
   every node/.style={font=\scriptsize,align=center},
-  box/.style={rounded corners=3pt,minimum height=0.92cm,inner sep=5pt,line width=0.75pt},
-  source/.style={box,draw=inkblue,fill=datablue,minimum width=2.25cm},
-  patch/.style={box,draw=warmline,fill=climorange,minimum width=3.05cm},
-  model/.style={box,draw=green!45!black,fill=modelgreen,minimum width=2.15cm},
-  forecast/.style={box,draw=violet!55!black,fill=resultpurple,minimum width=1.95cm},
-  compare/.style={box,draw=inkblue,fill=metricblue,text width=4.10cm,minimum height=2.50cm},
-  result/.style={box,draw=violet!55!black,fill=resultpurple,text width=3.45cm,minimum height=2.50cm},
-  flow/.style={-{Latex[length=2.2mm,width=1.45mm]},draw=black!62,line width=0.8pt,rounded corners=2pt},
-  patchflow/.style={flow,draw=warmline},
-  guide/.style={font=\tiny\bfseries,anchor=west,inner sep=0pt}
+  stage/.style={rounded corners=4pt,minimum height=3.35cm,inner xsep=8pt,
+    inner ysep=7pt,line width=0.85pt},
+  intervention/.style={stage,draw=warmline,fill=climorange,text width=3.45cm},
+  rollouts/.style={stage,draw=green!45!black,fill=modelgreen,text width=4.10cm},
+  readouts/.style={stage,draw=inkblue,fill=metricblue,text width=3.45cm},
+  evidence/.style={stage,draw=violet!55!black,fill=resultpurple,text width=3.35cm},
+  flow/.style={-{Stealth[length=2.4mm,width=1.65mm]},draw=inkblue!80,
+    line width=0.95pt,shorten <=1pt,shorten >=1pt}
 ]
-  \node[guide,text=inkblue] at (-1.15,1.85) {REFERENCE};
-  \node[guide,text=warmline] at (-1.15,-0.25) {CONTROLLED PATCH};
-  \node[source] (x) at (0,1.15) {ERA5 state $\mathbf{x}(t)$\\19 fields};
-  \node[source] (c) at (0,-1.15) {WB2 climatology $c_v(d,h)$\\same season and UTC};
-  \node[patch] (p) at (3.05,-1.15) {one field $v$ only\\$x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\$\alpha=0,.2,\ldots,1$};
-  \node[model] (mb) at (5.85,1.15) {frozen $f_\theta$\\reference rollout};
-  \node[model] (mp) at (5.85,-1.15) {same $f_\theta$\\patched rollout};
-  \node[forecast] (yb) at (8.30,1.15) {$\hat y_u^{(0)}$\\+6 h, +24 h};
-  \node[forecast] (yp) at (8.30,-1.15) {$\hat y_u^{(v,\alpha)}$\\+6 h, +24 h};
-  \node[compare] (cmp) at (12.00,0) {\textbf{paired comparison}\\same date, model, and lead\\[3pt]
-    $S_{vu}$: forecast displacement\\
-    $\Delta\acc_{vu}$: anomaly-skill change vs. ERA5};
-  \node[result] (r) at (17.15,0) {$19\!\times\!19$ matrices of $S$ and $\Delta\acc$\\dose-response curves\\spatial and latitude profiles};
-  \coordinate (cmpWtop) at ([yshift=1.15cm]cmp.west);
-  \coordinate (cmpWbottom) at ([yshift=-1.15cm]cmp.west);
-  \draw[flow] (x.east) -- (mb.west);
-  \draw[patchflow] (x.south) -- ++(0,-0.25) -| (p.north);
-  \draw[patchflow] (c.east) -- (p.west);
-  \draw[flow] (mb.east) -- (yb.west);
-  \draw[patchflow] (p.east) -- (mp.west);
-  \draw[patchflow] (mp.east) -- (yp.west);
-  \draw[flow] (yb.east) -- (cmpWtop);
-  \draw[patchflow] (yp.east) -- (cmpWbottom);
-  \draw[flow] (cmp.east) -- (r.west);
+  \node[intervention] (input) at (0,0) {%
+    {\sffamily\bfseries\color{warmline}1\quad CONTROLLED INPUT}\\[6pt]
+    choose one of 19 fields $v$\\[2pt]
+    $x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\[2pt]
+    $c_v$: day--UTC-matched climatology\\
+    $\alpha=0,.2,\ldots,1$; other 18 fields fixed};
+
+  \node[rollouts,right=8mm of input] (roll) {%
+    {\sffamily\bfseries\color{green!38!black}2\quad PAIRED ROLLOUTS}\\[7pt]
+    $\mathbf{x}(t)\ \xrightarrow{\quad f_\theta\quad}\ \hat{\mathbf y}^{(0)}(t+\tau)$\\[7pt]
+    $\mathbf{x}^{(v,\alpha)}(t)\ \xrightarrow{\ \mathrm{same}\ f_\theta\ }\
+      \ \hat{\mathbf y}^{(v,\alpha)}(t+\tau)$\\[6pt]
+    frozen weights; same date and lead $\tau$};
+
+  \node[readouts,right=8mm of roll] (measure) {%
+    {\sffamily\bfseries\color{inkblue}3\quad TWO READOUTS}\\[7pt]
+    $S_{vu}$\\[-1pt]
+    forecast displacement\\[6pt]
+    $\Delta\acc_{vu}$\\[-1pt]
+    ERA5-verified anomaly-skill change\\[5pt]
+    area weighted; $\tau=6,24$ h};
+
+  \node[evidence,right=8mm of measure] (output) {%
+    {\sffamily\bfseries\color{violet!60!black}4\quad AGGREGATE}\\[7pt]
+    directed $19\!\times\!19$ matrices\\[4pt]
+    dose--response curves\\[4pt]
+    spatial error maps\\[4pt]
+    field-specific latitude profiles};
+
+  \draw[flow] (input.east) -- (roll.west);
+  \draw[flow] (roll.east) -- (measure.west);
+  \draw[flow] (measure.east) -- (output.west);
 \end{tikzpicture}}
-\caption{Paired intervention audit. One input field is mixed with matched climatology while the date, model weights, and other 18 fields remain fixed. Comparing both rollouts separates displacement from the baseline forecast, $S$, from verified anomaly-skill change, $\Delta\acc$. Repeating the intervention over input-output pairs, doses, and grid cells produces directed matrices, dose curves, and spatial profiles.}
+\caption{Paired intervention audit. A season- and UTC-matched perturbation is passed through the same frozen model as the reference state. The paired forecasts yield two distinct readouts: displacement from the reference rollout, $S$, and verified anomaly-skill change, $\Delta\acc$. Repeating the audit over input--output pairs and perturbation doses produces directed matrices and spatial summaries.}
 \label{fig:method}
 \end{figure}
 
