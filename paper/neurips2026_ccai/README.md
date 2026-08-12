@@ -17,18 +17,14 @@ references start on page 5 and the supplementary material follows them.
 From this directory:
 
 ```bash
-typst compile --root . --input lang=en figures/method_pipeline.typ figures/method_pipeline_en.pdf
-typst compile --root . --input lang=ru figures/method_pipeline.typ figures/method_pipeline_ru.pdf
 latexmk -pdf -interaction=nonstopmode -halt-on-error -outdir=build/en main_en.tex
 latexmk -xelatex -interaction=nonstopmode -halt-on-error -outdir=build/ru main_ru.tex
 ```
 
 The English version uses pdfLaTeX as requested by the template. The Russian
-mirror uses XeLaTeX so Cyrillic glyphs remain embedded and searchable.
-Figure 1 is maintained as one bilingual Typst/CeTZ source. Linux Biolinum is
-used for labels and New Computer Modern Math for equations; both fonts are
-embedded in the vector PDFs. Arrow ports and routes are fixed rather than
-automatically re-laid out during the LaTeX build.
+mirror uses XeLaTeX so Cyrillic glyphs remain embedded and searchable. Figure 1
+is the original TikZ diagram from the Russian manuscript; the English version
+keeps the same geometry and translates only the labels.
 
 Final checked PDFs are copied to:
 

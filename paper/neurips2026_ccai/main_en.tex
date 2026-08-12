@@ -52,7 +52,41 @@ ERA5 provides initial states and verification truth~\citep{hersbach2020era5}; We
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/method_pipeline_en.pdf}
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize,align=center,inner sep=4pt},
+  source/.style={draw=inkblue,rounded corners=2.5pt,fill=datablue,minimum width=2.35cm,minimum height=0.82cm,line width=0.65pt},
+  clim/.style={draw=warmline,rounded corners=2.5pt,fill=climorange,minimum width=2.35cm,minimum height=0.82cm,line width=0.65pt},
+  patch/.style={draw=warmline,rounded corners=2.5pt,fill=white,minimum width=3.10cm,minimum height=1.02cm,line width=0.75pt},
+  model/.style={draw=green!45!black,rounded corners=2.5pt,fill=modelgreen,minimum width=2.25cm,minimum height=0.86cm,line width=0.65pt},
+  forecast/.style={draw=violet!55!black,rounded corners=2.5pt,fill=resultpurple,minimum width=2.20cm,minimum height=0.86cm,line width=0.65pt},
+  metric/.style={draw=inkblue,rounded corners=2.5pt,fill=metricblue,minimum width=2.65cm,minimum height=1.02cm,line width=0.75pt},
+  result/.style={draw=violet!55!black,rounded corners=2.5pt,fill=resultpurple,minimum width=2.70cm,minimum height=1.02cm,line width=0.75pt},
+  flow/.style={-{Latex[length=2.2mm,width=1.45mm]},draw=black!65,line width=0.75pt,rounded corners=3pt},
+  patchflow/.style={flow,draw=warmline},
+  lane/.style={font=\tiny\bfseries,anchor=west,inner sep=0pt}
+]
+  \node[lane,text=inkblue] at (-1.15,1.72) {BASELINE};
+  \node[lane,text=warmline] at (-1.15,-0.48) {INTERVENTION};
+  \node[source] (x) at (0,1.08) {ERA5 state $\mathbf{x}(t)$\\19 fields};
+  \node[clim] (c) at (0,-1.18) {WB2 climatology $\mathbf{c}(d,h)$\\season + UTC hour};
+  \node[model] (mb) at (5.90,1.08) {frozen $f_\theta$\\baseline rollout};
+  \node[patch] (p) at (3.05,-1.18) {$x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\$x_{j\ne v}^{(\alpha)}=x_j$};
+  \node[model] (mp) at (5.90,-1.18) {same $f_\theta$\\patched rollout};
+  \node[forecast] (yb) at (8.45,1.08) {$\hat y_u^{(0)}$\\+6 h, +24 h};
+  \node[forecast] (yp) at (8.45,-1.18) {$\hat y_u^{(v,\alpha)}$\\+6 h, +24 h};
+  \node[metric] (m) at (11.40,0) {$S_{vu}$ and $\Delta\acc_{vu}$\\area-weighted; ERA5 truth};
+  \node[result] (r) at (14.70,0) {directed $19\!\times\!19$ matrices\\dose curves; error maps};
+  \draw[flow] (x.east) -- (mb.west);
+  \draw[flow] (mb.east) -- (yb.west);
+  \draw[patchflow] (x.south) -- ++(0,-0.43) -| (p.north);
+  \draw[patchflow] (c.east) -- (p.west);
+  \draw[patchflow] (p.east) -- (mp.west);
+  \draw[patchflow] (mp.east) -- (yp.west);
+  \draw[flow] (yb.east) -- (m.north west);
+  \draw[patchflow] (yp.east) -- (m.south west);
+  \draw[flow] (m.east) -- (r.west);
+\end{tikzpicture}}
 \caption{Paired intervention audit. A season- and UTC-matched perturbation is passed through the same frozen model as the reference state. The paired forecasts yield two distinct readouts: displacement from the reference rollout, $S$, and verified anomaly-skill change, $\Delta\acc$. Repeating the audit over input--output pairs and perturbation doses produces directed matrices and spatial summaries.}
 \label{fig:method}
 \end{figure}
