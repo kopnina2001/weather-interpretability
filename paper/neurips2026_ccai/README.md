@@ -3,7 +3,10 @@
 Two anonymous workshop-style manuscripts are provided:
 
 - `main_en.tex` -- English submission draft;
-- `main_ru.tex` -- Russian review/communication mirror.
+- `main_ru.tex` -- Russian content draft.
+
+The Russian draft is the content source. The English manuscript mirrors its
+section order, experiments, figures, claims, limitations, and citations.
 
 Both use the unmodified `tackling_climate_workshop_style.sty` from
 `TCCML_NeurIPS_2026_Style_File.zip`. The IMRAD main text occupies four pages;
@@ -59,5 +62,6 @@ The English PDF is anonymous and formatted for the Papers track. Replace the
 author block only after acceptance or when building a `[preprint]` version.
 All figures referenced by `main_en.tex` have English labels. The deterministic
 `plots/translate_paper_figures.py` script recreates the English raster copies
-without changing any numerical panel or map; the Russian source figures remain
-available to `main_ru.tex`.
+and the dedicated bilingual `T1000` panels used in Figure 3 without changing
+any numerical panel or map; the Russian source figures remain available to
+`main_ru.tex`.

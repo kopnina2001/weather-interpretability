@@ -51,10 +51,35 @@ def vertical_centered(
 ) -> None:
     probe = ImageDraw.Draw(image)
     left, top, right, bottom = probe.textbbox((0, 0), text, font=font)
-    layer = Image.new("RGBA", (right - left + 10, bottom - top + 10), WHITE)
+    layer = Image.new(
+        "RGBA", (right - left + 10, bottom - top + 10), (255, 255, 255, 0)
+    )
     ImageDraw.Draw(layer).text((5 - left, 5 - top), text, font=font, fill=BLACK)
-    layer = layer.rotate(90, expand=True, fillcolor=WHITE)
+    layer = layer.rotate(90, expand=True, fillcolor=(255, 255, 255, 0))
     image.alpha_composite(layer, (xy[0] - layer.width // 2, xy[1] - layer.height // 2))
+
+
+def find_vertical_label_box(
+    image: Image.Image, search: tuple[int, int, int, int]
+) -> tuple[int, int, int, int]:
+    """Find the rightmost text column group in a colour-bar margin."""
+    x0, y0, x1, y1 = search
+    gray = image.convert("L").crop(search)
+    active = [
+        x
+        for x in range(gray.width)
+        if gray.crop((x, 0, x + 1, gray.height)).getextrema()[0] < 245
+    ]
+    if not active:
+        raise ValueError(f"no vertical label found in {search}")
+    groups: list[list[int]] = []
+    for x in active:
+        if not groups or x > groups[-1][-1] + 1:
+            groups.append([x])
+        else:
+            groups[-1].append(x)
+    group = groups[-1]
+    return (x0 + group[0] - 3, y0, x0 + group[-1] + 4, y1)
 
 
 DOSE_CASES = {
@@ -223,17 +248,43 @@ def translate_bias(model: str, lead: int) -> Path:
             spacing=1,
         )
 
-    # Colour-bar labels are the only remaining Russian text in the map panels.
-    for x, y, label in (
-        (1086, 450, "Delta RMSE, kg/kg"),
-        (2211, 450, "Delta RMSE, K"),
-        (1086, 1120, "Delta RMSE, m/s"),
-        (2211, 1120, "Delta RMSE, m/s"),
-    ):
-        blank(draw, (x - 10, y - 118, x + 10, y + 118))
-        vertical_centered(image, (x, y), label, FONT(16))
+    # Tick-label widths move the source labels between panels.  Detect each
+    # source label before repainting it so that no Russian fragments remain and
+    # no tick value is erased.  The translation itself has no opaque backing.
+    label_specs = (
+        ((980, 330, 1180, 570), (1120, 450), "Delta RMSE, kg/kg"),
+        ((2160, 330, 2370, 570), (2260, 450), "Delta RMSE, K"),
+        ((980, 1000, 1180, 1240), (1120, 1120), "Delta RMSE, m/s"),
+        ((2160, 1000, 2370, 1240), (2260, 1120), "Delta RMSE, m/s"),
+    )
+    labels = [
+        (find_vertical_label_box(image, search), xy, label)
+        for search, xy, label in label_specs
+    ]
+    for box, xy, label in labels:
+        blank(ImageDraw.Draw(image), box)
+        vertical_centered(image, xy, label, FONT(16))
 
     image.save(dst, optimize=True)
+    return dst
+
+
+T1000_CROP = (1180, 225, 2340, 700)
+
+
+def crop_t1000_panel(model: str, lead: int, language: str) -> Path:
+    """Extract the complete T1000 map and colour bar for the main-text figure."""
+    if language not in {"ru", "en"}:
+        raise ValueError(f"unsupported language: {language}")
+    prefix = "composite_bias" if model == "aurora" else "composite_bias_pangu"
+    stem = f"{prefix}_Z1000_lead{lead}_alpha1_n48"
+    suffix = "_en" if language == "en" else ""
+    src = ROOT / "figures" / "bias_maps" / f"{stem}{suffix}.png"
+    dst = src.with_name(f"{stem}_t1000_{language}.png")
+    image = Image.open(src).convert("RGBA")
+    if image.size != (2380, 1470):
+        raise ValueError(f"unexpected bias figure size for {src}: {image.size}")
+    image.crop(T1000_CROP).save(dst, optimize=True)
     return dst
 
 
@@ -272,10 +323,12 @@ def translate_acc_strip() -> Path:
     blank(draw, (0, 180, 49, 1525))
     for y in (338, 690, 1042, 1391):
         vertical_centered(image, (25, y), "patched field", FONT(19))
+    draw = ImageDraw.Draw(image)
     blank(draw, (1970, 150, 2045, 1525))
     for y in (338, 690, 1042, 1391):
         vertical_centered(image, (2007, y), "Delta ACC_w (blue = worse)", FONT(17))
 
+    draw = ImageDraw.Draw(image)
     blank(draw, (730, 1581, 1510, 1631))
     centered(draw, (1120, 1605), "forecast field", FONT(21))
 
@@ -289,6 +342,8 @@ if __name__ == "__main__":
         for lead in (6, 24):
             outputs.append(translate_dose(model, lead))
             outputs.append(translate_bias(model, lead))
+            outputs.append(crop_t1000_panel(model, lead, "ru"))
+            outputs.append(crop_t1000_panel(model, lead, "en"))
     outputs.append(translate_acc_strip())
     for output in outputs:
         print(output.relative_to(ROOT))
