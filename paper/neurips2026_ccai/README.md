@@ -57,6 +57,7 @@ presented as completed experiments.
 
 The English PDF is anonymous and formatted for the Papers track. Replace the
 author block only after acceptance or when building a `[preprint]` version.
-The English supplement reuses two committed dose-response panels whose embedded
-plot annotations are in Russian; their paper captions and all main-text figures
-are English.
+All figures referenced by `main_en.tex` have English labels. The deterministic
+`plots/translate_paper_figures.py` script recreates the English raster copies
+without changing any numerical panel or map; the Russian source figures remain
+available to `main_ru.tex`.
