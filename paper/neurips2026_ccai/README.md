@@ -6,8 +6,8 @@ Two anonymous workshop-style manuscripts are provided:
 - `main_ru.tex` -- Russian review/communication mirror.
 
 Both use the unmodified `tackling_climate_workshop_style.sty` from
-`TCCML_NeurIPS_2026_Style_File.zip`. The core manuscript follows IMRAD and is
-separated from references and supplementary figures with `\clearpage`.
+`TCCML_NeurIPS_2026_Style_File.zip`. The IMRAD main text occupies four pages;
+references start on page 5 and the supplementary material follows them.
 
 ## Build
 
@@ -32,8 +32,28 @@ The committed code, README, and rendered figures were checked together. The
 `data` and `results` symlinks point to `/srv/exw` and were unavailable on the
 authoring host, so raw arrays and confidence intervals were not recomputed.
 The manuscript says this explicitly and treats reported values as descriptive
-point estimates. Before submission, reconnect the run store and add date-block
-bootstrap confidence intervals for the promoted numerical claims.
+point estimates.
+
+`analysis/compare_models_19var.py` now uses `rel_sens_w` and `dacc_w` by
+default. The previously reported cross-model `r=0.913` came from the unweighted
+comparison and is not promoted in the four-page paper. After reconnecting the
+run store, execute:
+
+```bash
+python analysis/bootstrap_19var.py --n-bootstrap 5000
+```
+
+The script resamples calendar-month blocks and writes one table for all
+area-weighted matrix cells and one table for the key directional and attenuation
+results. A fresh `compute_19var_matrix.py` run also adds normalized
+truth-relative delta RMSE; the bootstrap then reports whether the Z500 error
+against ERA5 decreases from +6 to +24 h. Replace the point estimates with these
+intervals before submission.
+
+The repository still lacks three confirmatory results: truth-relative recovery
+across at least three leads, an orography/below-ground mask, and a second
+season-matched corruption. These are described in Appendix A and must not be
+presented as completed experiments.
 
 The English PDF is anonymous and formatted for the Papers track. Replace the
 author block only after acceptance or when building a `[preprint]` version.

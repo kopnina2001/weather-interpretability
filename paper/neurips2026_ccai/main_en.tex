@@ -35,20 +35,20 @@
 \maketitle
 
 \begin{abstract}
-Weather forecast models can partly correct a corrupted input field while passing some of its error to other variables. We measure this behavior in Aurora and Pangu-Weather by replacing one field with climatology and comparing the resulting forecast with an unmodified run. Repeating the test for 19 fields and 48 dates gives a directed error-transfer matrix. Six replacement levels measure how the response grows with the input error. Both models suppress some perturbations over time, but lower-tropospheric geopotential ($Z1000/Z850$) strongly affects temperature and wind. At +6 h, changing $Z850$ affects $V850$ about nine times more than the reverse intervention. The stronger lower-level response is consistent with the effects of orography and below-ground extrapolation, although we do not isolate that mechanism. Spatial maps show where the transferred error accumulates. These diagnostics can rank influential fields and guide controlled tests of field- and latitude-specific training weights. They describe dependencies learned by the models, not causal relations in the atmosphere.
+We study how an error in one input field propagates through a multivariate weather forecast. In Aurora and Pangu-Weather, one of 19 fields is replaced by climatology while the other inputs stay fixed. Forty-eight dates yield directed response matrices at +6 and +24 h, dose curves, and spatial maps. In both models, replacing $Z850$ changes $V850$ about nine times more than the reverse intervention. The direct trace of a $Z500$ perturbation shrinks by +24 h, although errors remain in other fields. Lower-level geopotential has the broadest effects on temperature, humidity, and wind; the possible contribution of terrain has not yet been separated from vertical coupling. The audit ranks error-transfer paths and defines testable field- and latitude-weighting schemes for training. It describes how a model uses information, not causal relations in the atmosphere.
 \end{abstract}
 
 \section{Introduction}
 
-Pangu-Weather and Aurora produce global, high-resolution forecasts at low marginal cost~\citep{bi2023pangu,bodnar2025aurora}. Aggregate scores collapse their multivariate behavior into a few numbers. A model may achieve a similar score while relying on different input channels, reconstructing a missing field from neighboring levels, or propagating one bad field across many outputs. Forecast centers need this information before using a model in early-warning or climate-service workflows~\citep{wmo2025earlywarning}. Existing interpretation methods use gradients, perturbations, and representation analysis~\citep{yang2024survey}; gradients are expensive for billion-parameter global models, while correlations provide no direction of dependence.
+Pangu-Weather and Aurora produce global, high-resolution forecasts at low marginal cost~\citep{bi2023pangu,bodnar2025aurora}. RMSE and ACC measure final skill but do not identify which input field produced an error in another output or whether a damaged channel can be reconstructed from neighboring variables. This matters for climate services because equal mean skill can hide different sensitivity to analysis and observation errors~\citep{wmo2025earlywarning}.
 
-We replace one input field with its expected seasonal and diurnal state, then measure which outputs move and how much. The study covers 19 inputs and outputs, Aurora and Pangu-Weather, and leads of 6 and 24 h. A continuous dose sweep checks whether the full replacement is a sensible endpoint, and spatial composites locate the added error. The method is an audit for forecast components used in adaptation and early warning; it does not perform climate attribution or estimate mitigation effects.
+Weather-model interpretation uses gradients, perturbations, and representation analysis~\citep{yang2024survey}. Recent studies identified advection heads in Aurora~\citep{macmillan2026advection}, examined latent directions in GraphCast~\citep{tempest2026tool}, and imposed controlled chemical perturbations on Aurora~\citep{hu2026chemistry}. Our observable is the directed response of every physical output rather than an internal network component, so the same audit can be used for a model whose activations are unavailable.
+
+We replace one field by seasonal-diurnal climatology and measure the changes in all 19 outputs. A full matrix identifies errors that spread widely, six replacement levels quantify response size, and maps locate the added error. The study concerns diagnostics for models used in climate services and adaptation. It does not estimate climate attribution or emission reductions.
 
 \section{Methods}
 
-\subsection{Evaluation data and forecast models}
-
-ERA5 provides initial states and verification truth~\citep{hersbach2020era5}; WeatherBench 2 climatology is matched by day of year and UTC hour and is computed over 1990--2019~\citep{rasp2024weatherbench2}. We evaluate Aurora (1.3B parameters; two input times) and Pangu-Weather (256M; one input time) on their $0.25^\circ$ grids. The reported $19\times19$ matrices, dose curves, and spatial composites use 48 initializations in 2024: four dates per month, with 00/06/12/18 UTC balanced across the sample. Appendix~\ref{app:provenance} separates this set from the repository's 2024--2025 runs. The 19 audited fields are MSLP, 10-m $u/v$, 2-m temperature, and geopotential $Z$, specific humidity $Q$, temperature $T$, and $u/v$ wind at 1000, 850, and 500 hPa. Aurora's two input snapshots are both intervened upon.
+ERA5 provides initial states and verification truth~\citep{hersbach2020era5}; WeatherBench 2 climatology is matched by day of year and UTC hour and is computed over 1990--2019~\citep{rasp2024weatherbench2}. We use Aurora (1.3B parameters; two input times) and Pangu-Weather (256M; one input time) on a $0.25^\circ$ grid. The main sample has 48 initializations in 2024: four dates per month, balanced over 00/06/12/18 UTC. The fields are MSLP, 10-m $u/v$, 2-m temperature, and $Z,Q,T,u,v$ at 1000, 850, and 500 hPa. Both Aurora input times are patched. A separate seven-field Aurora check spans 2024--2025 (Appendix~\ref{app:provenance}).
 
 \begin{figure}[t]
 \centering
@@ -87,28 +87,18 @@ ERA5 provides initial states and verification truth~\citep{hersbach2020era5}; We
   \draw[patchflow] (yp.east) -- ([yshift=-0.27cm]m.west);
   \draw[flow] (m.east) -- (r.west);
 \end{tikzpicture}}
-\caption{Paired field-replacement audit. The date, model weights, and 18 untouched fields stay fixed. Full replacement ($\alpha=1$) supplies the matrix entry; six values of $\alpha$ trace the response.}
+\caption{Paired audit of one field. The date, model, and other 18 fields stay fixed. Full replacement supplies a matrix entry; six values of $\alpha$ trace the dose response.}
 \label{fig:method}
 \end{figure}
 
-\subsection{Paired field replacement and metrics}
-
-For input field $v$, $P_v$ replaces that complete global field by climatology. For output field $u$, lead $\tau$, and initialization set $\mathcal D$, we report
+Input field $v$ is replaced by climatology. For output $u$, lead $\tau$, and date set $\mathcal D$, we report
 \begin{align}
 S_{vu}(\tau)&=\frac{1}{|\mathcal D|}\sum_{t\in\mathcal D}
 \frac{\rmse_w(\hat y_u^{(v)},\hat y_u^{(0)})}{\sigma_w(y_u)}, \\
 \Delta\acc_{vu}(\tau)&=\frac{1}{|\mathcal D|}\sum_{t\in\mathcal D}
 \left[\acc_w(\hat y_u^{(v)},y_u,c_u)-\acc_w(\hat y_u^{(0)},y_u,c_u)\right].
 \end{align}
-All spatial sums use normalized $\cos\phi$ weights. $S$ measures forecast displacement; negative $\Delta\acc$ records a loss of verified anomaly skill. The dose experiment patches $Z1000$ at $\alpha\in\{0,.2,.4,.6,.8,1\}$ and reports $\rmse_w/\sigma_w(y-c)$, where one is the climatology no-skill reference. The intervention measures how the fitted network uses an input. It cannot establish atmospheric causality.
-
-\subsection{What the intervention controls}
-
-Climatology is used as a structured corruption rather than as a forecast. It preserves the expected season and UTC hour but removes the date-specific circulation carried by one field. The resulting state is deliberately inconsistent: the patched channel describes a typical day while the other 18 channels still describe the selected ERA5 analysis. This mismatch is the stress applied to the network. It is more interpretable than additive white noise because $\alpha$ has the same meaning for every grid cell, but full replacement can still take the joint state outside the combinations seen during training.
-
-The paired construction isolates that stress as far as the stored forecasts allow. Baseline and patched runs share the initialization date, verification target, model weights, and untouched fields. Both Aurora input snapshots are changed so that the model cannot recover the original value from its second time slice. For $\alpha<1$, only the distance between the selected field and its climatology changes. A monotone response across all six doses supports the use of $\alpha=1$ for ranking, while the absence of a plateau warns that the endpoint is a finite stress test rather than a local gradient.
-
-The two metrics prevent one convenient but incorrect reading. $S$ compares two forecasts and can reveal internal compensation even when both disagree with ERA5. $\Delta\acc$ anchors the displacement to verification and tests whether anomaly skill was lost. Agreement between them is stronger evidence of harmful transfer than either metric alone. Neither metric says that the patched input caused the corresponding atmospheric process; it says that the trained forecast operator used information along that directed path.
+Spatial sums use normalized $\cos\phi$ weights. $S$ measures distance from the baseline forecast; negative $\Delta\acc$ records a loss of anomaly skill against ERA5. For the dose sweep, $Z1000$ is mixed with climatology at $\alpha\in\{0,.2,.4,.6,.8,1\}$; spatial composites compute temporal RMSE at each grid cell. The patch retains season and UTC hour but creates an inconsistent multivariate state. Thus $\alpha=1$ is a finite stress test, not a local gradient or evidence of atmospheric causality.
 
 \section{Results}
 
@@ -124,39 +114,17 @@ The two metrics prevent one convenient but incorrect reading. $S$ compares two f
   \includegraphics[width=\linewidth,trim=0.30in 0.12in 9.25in 8.65in,clip]{../../figures/patching_matrices/matrix_19var_pangu_n48_weighted.png}
   \\(b) Pangu-Weather, $\Delta\acc_w$, +6 h
 \end{minipage}
-\caption{Verified cross-field skill loss at +6 h. The panels show area-weighted $\Delta\acc_{vu}$ (row: patched input; column: affected output); negative values mean lower anomaly skill. Each panel includes its own colorbar; cross-model comparisons should still use the printed cell values because the limits differ. Full +6/+24 h matrices appear in Appendix~\ref{app:figures}.}
+\caption{Skill loss at +6 h: rows are patched inputs and columns are outputs. Negative $\Delta\acc_w$ means degradation. Panel scales differ, so compare printed values. Full matrices appear in Appendix~\ref{app:figures}.}
 \label{fig:matrixoverview}
 \end{figure}
 
-\subsection{A field error can attenuate while spreading}
+\subsection{Direction and attenuation}
 
-The off-diagonal sensitivity entries of Aurora and Pangu correlate at $r=0.913$, but neither matrix is symmetric (Appendix~\ref{app:fullmatrices}). Figure~\ref{fig:matrixoverview} shows the corresponding change in verified anomaly skill. At +6 h, $S_{Z850,V850}$ is $0.38$ for Aurora and $0.47$ for Pangu; the reverse entries are $0.04$ and $0.05$. The roughly ninefold contrast appears in both architectures. Diagonal entries distinguish fields that the network can reconstruct from context. Aurora gives $S_{Z500,Z500}=0.08$ and $S_{\mathrm{MSLP},\mathrm{MSLP}}=0.45$ at +6 h; Pangu gives $0.19$ and $0.53$. These values support redundancy in $Z500$ and stronger unique dependence on MSLP, especially for Aurora.
+The matrices are asymmetric. At +6 h, $S_{Z850,V850}$ is $0.38$ for Aurora and $0.47$ for Pangu, while the reverse entries are $0.04$ and $0.05$. The roughly ninefold contrast recurs in both architectures. Diagonal $S_{Z500,Z500}$ falls from $0.08$ to $0.04$ in Aurora and from $0.19$ to $0.09$ in Pangu between +6 and +24 h. This is a return toward the baseline trajectory, not demonstrated improvement against ERA5: off-diagonal errors remain.
 
-\begin{table}[t]
-\caption{Measured error attenuation and transfer over 48 dates. The repository stores point estimates but no date-block confidence intervals.}
-\label{tab:results}
-\centering
-\small
-\begin{tabularx}{\linewidth}{@{}p{0.27\linewidth}Y Y@{}}
-\toprule
-Diagnostic & Evidence & Interpretation \\
-\midrule
-Cross-model structure & off-diagonal $r=0.913$ & many dependencies recur across architectures \\
-Direction at +6 h & $Z850\!\to V850$: $0.38/0.47$; reverse: $0.04/0.05$ (Aurora/Pangu) & mass-to-wind dependence is about ninefold stronger \\
-Partial attenuation & $S_{Z500,Z500}$: $0.08\to0.04$ / $0.19\to0.09$ (+6$\to$+24 h) & the patched field moves back toward the baseline in both models \\
-$T1000$ dose slope & Aurora: $0.690\to0.217$; Pangu: $0.406\to0.614$ (+6$\to$+24 h) & lead-time behavior differs by model \\
-$T1000$ spatial RMSE & Aurora: $6.02\times/2.01\times$; Pangu: $3.35\times/3.06\times$ (+6/+24 h) & the response covers 99--100\% of grid cells \\
-\bottomrule
-\end{tabularx}
-\end{table}
+\subsection{Dose and spatial footprint}
 
-\subsection{\texorpdfstring{$Z1000$}{Z1000} perturbations expose different lead-time responses}
-
-All six $Z1000$ dose points rise, with no plateau before $\alpha=1$. For Aurora at +6 h, the fitted slopes are $0.690$ for $T1000$, $0.274$ for $Q1000$, and $0.180/0.187$ for $U/V1000$. The $T1000$ slope falls to $0.217$ at +24 h. Pangu follows a different lead-time pattern: its $T1000$ slope rises from $0.406$ to $0.614$, and its $T2M$ slope rises from $0.387$ to $0.570$. The full replacement therefore ranks finite model sensitivity, while the intermediate points show why it should not be read as an infinitesimal Jacobian.
-
-\subsection{\texorpdfstring{$Z1000$}{Z1000} error spreads across latitude bands}
-
-The $T1000$ composite in Fig.~\ref{fig:bias} reports temporal RMSE at every grid cell, patched minus baseline. At +6 h, full $Z1000$ replacement raises the global mean of per-cell $T1000$ RMSE by $6.02\times$ for Aurora and $3.35\times$ for Pangu. At +24 h, the ratios are $2.01\times$ and $3.06\times$. The increase covers 99--100\% of cells. Aurora weakens markedly by +24 h; Pangu retains most of its response. Large increments concentrate in mid and high latitudes, while Pangu shows broader tropical and subtropical increments.
+All six $Z1000$ doses rise without a plateau. The $T1000$ response slope in Aurora falls from $0.690$ to $0.217$ between +6 and +24 h, while Pangu rises from $0.406$ to $0.614$. The models do not damp every perturbation. After full replacement, mean per-cell $T1000$ RMSE increases by $6.02/2.01\times$ in Aurora and $3.35/3.06\times$ in Pangu at +6/+24 h. The increase covers 99--100\% of cells, with different latitude profiles across models.
 
 \begin{figure}[t]
 \centering
@@ -181,47 +149,42 @@ The $T1000$ composite in Fig.~\ref{fig:bias} reports temporal RMSE at every grid
   \includegraphics[width=\linewidth,trim=8.10in 5.55in 0.20in 1.58in,clip]{../../figures/bias_maps/composite_bias_pangu_Z1000_lead24_alpha1_n48.png}
   \\(d) Pangu-Weather, +24 h: $3.06\times$
 \end{minipage}
-\caption{Geographic footprint of a $Z1000$ input error. The panels show the change in per-grid-cell temporal RMSE of $T1000$ after full replacement ($\alpha=1$); red marks larger error than the baseline. Labels give the global mean ratio of per-cell RMSE. The latitude structure motivates testing field-specific spatial weights, but does not validate them.}
+\caption{Change in temporal $T1000$ RMSE after replacing $Z1000$; red denotes larger error. Labels give mean per-cell ratios without area weighting.}
 \label{fig:bias}
 \end{figure}
 
 \section{Discussion}
 
-\subsection{Reading correction and transfer in the same matrix}
+\begin{table}[b]
+\caption{Point estimates over 48 dates. Confidence intervals have not yet been computed.}
+\label{tab:results}
+\centering
+\small
+\begin{tabularx}{\linewidth}{@{}p{0.36\linewidth}Y Y@{}}
+\toprule
+Diagnostic & Aurora & Pangu-Weather \\
+\midrule
+$Z850\!\to V850$ / reverse, +6 h & $0.38/0.04$ & $0.47/0.05$ \\
+$Z500$ diagonal, +6$\to$+24 h & $0.08\to0.04$ & $0.19\to0.09$ \\
+$Z1000\!\to T1000$ slope, +6/+24 h & $0.690\to0.217$ & $0.406\to0.614$ \\
+Per-cell $T1000$ RMSE, +6/+24 h & $6.02\times/2.01\times$ & $3.35\times/3.06\times$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
-The diagonal and off-diagonal entries describe different parts of one rollout. A declining diagonal means that the forecast of the patched variable moves back toward the unmodified forecast. It does not mean that the multivariate state has recovered. For $Z500$, the diagonal sensitivity falls from $0.08$ to $0.04$ in Aurora and from $0.19$ to $0.09$ in Pangu between +6 and +24 h, yet nonzero off-diagonal entries remain. The model has used correlated fields to reconstruct part of $Z500$, while the earlier inconsistency has already changed other outputs. This is the sense in which a learned forecast can self-correct one field and degrade its neighbors at the same time. Pangu's increasing $T1000$ dose response is a counterexample to universal correction: some errors continue to grow.
+Diagonal attenuation and transfer to neighboring fields are parts of the same rollout. The model reconstructs part of $Z500$ from context after the inconsistency has already changed other outputs. This should not be called forecast improvement until the additional error against ERA5 is measured at several leads. The matrix is also not a correlation matrix: each direction requires a separate run.
 
-Rows and columns must therefore be read directionally. $S_{vu}$ asks how an error in input $v$ changes output $u$; $\Delta\acc_{vu}$ asks whether that displacement also reduces agreement with ERA5 anomalies. A large $S$ need not produce a proportional ACC loss because a displaced field may preserve its anomaly pattern. Likewise, the matrix is not a correlation matrix: the reverse intervention is a separate forecast. The $Z850\!\to V850$ response is $0.38/0.47$ in Aurora/Pangu, whereas $V850\!\to Z850$ is $0.04/0.05$. This directional contrast is hidden by ordinary field correlations.
+Lower-tropospheric geopotential gives the broadest response. $Z1000$ and $Z850$ retain sharper effects of terrain and below-ground extrapolation than $Z500$. The experiment does not separate this from vertical coupling; it needs a below-ground mask and terrain-height strata. A second corruption is also needed because full climatology replacement leaves the distribution of training states.
 
-Lower-tropospheric geopotential produces the broadest physically coherent responses in the selected diagnostics. Its errors reach near-surface temperature, humidity, and wind; the strongest reported asymmetry is the $Z850$ to $V850$ path. A plausible reason is that $Z1000$ and $Z850$ retain sharper signatures of terrain and below-ground extrapolation than smoother upper-level fields. Replacing them by climatology removes more local structure than replacing $Z500$. The present experiment supports that interpretation but does not separate terrain effects from vertical coupling. An orography-stratified evaluation is needed before assigning the response to either mechanism.
+The matrix ranks outward field influence, the dose slope supplies a finite response coefficient, and latitude profiles locate the added error. These quantities can select $\lambda_N$ and field-specific $w_N(\phi)$ in $\mathcal L=\sum_N\lambda_N\sum_s w_N(\phi_s)\ell_N(s)$. This is a matched retraining plan, not a demonstrated gain.
 
-The smaller Aurora audit over seven fields provides a temporal check beyond the common 2024 sample. Its 48 dates span 2024--2025. The ordering remains similar: at +6 h, the MSLP and $Z500$ diagonals are $0.46$ and $0.08$; at +24 h they are $0.27$ and $0.04$, and $Z850\!\to V850$ remains stronger than the reverse direction. This check does not extend Pangu to 2025 and is not pooled with the weighted 19-field matrices.
+A smaller seven-field Aurora audit provides a temporal check on 48 dates spanning 2024--2025. It retains a low $Z500$ diagonal and the stronger $Z850\!\to V850$ direction, but its different field set and lack of Pangu forecasts prevent pooling it with the main matrix.
 
-\subsection{From a measured response to a training experiment}
-
-The dose sweep turns a qualitative dependency into a finite response coefficient. Let $b_{MN}(\tau)$ be the fitted slope of the normalized error in output $N$ against the replacement fraction $\alpha$ of input $M$. Within the measured range, another ten percentage points of replacement correspond to an expected change of about $0.1b_{MN}$ in normalized output error. This statement is empirical and local to the tested intervention; it is not a physical derivative. Repeating the sweep for every ordered pair would give an explicit table of how much controlled degradation in one field changes every other forecast field.
-
-Three summaries connect that table to a loss-design experiment. The diagonal ratio $R_M=S_{MM}(24)/S_{MM}(6)$ measures whether field $M$ is reconstructed during the rollout. The outward influence $I_M=\sum_{N\ne M}S_{MN}$ ranks inputs whose errors spread most widely. Latitude profiles $E_{MN}(\phi)$ locate the transferred error. These quantities suggest which upstream fields deserve larger output penalties and where a common area weight leaves persistent regional error. A candidate objective is
-\begin{equation}
-\mathcal L=\sum_N\lambda_N\sum_s w_N(\phi_s)\,\ell_N(s),
-\end{equation}
-where $\lambda_N$ is field-specific and $w_N$ modifies the usual area weighting for field $N$. The maps in Fig.~\ref{fig:bias} argue against using one correction for every variable: Aurora and Pangu place the added $T1000$ error in different latitude bands. The coefficients are hypotheses, not a trained result. They should be normalized, fixed before evaluation, and tested by matched retraining against the original loss.
-
-\subsection{Limits and next experiments}
-
-The common comparison contains 48 dates from 2024, two short leads, and three pressure levels. It has no ensemble dimension or date-block confidence intervals. The source arrays are stored outside this repository and were unavailable during paper assembly; the values were checked against committed figures, captions, and analysis code but not recomputed. A stronger evaluation needs accessible arrays, paired uncertainty intervals, more dates, longer leads, and inputs restricted to information available at forecast issue time.
-
-Probabilistic models require paired ensemble experiments. For GenCast, FuXi-S2S, or LaDCast, the random seed and initial perturbation should be matched between the baseline and patched members. The output is then a distribution of $S$ and $\Delta\acc$, accompanied by CRPS and spread--error diagnostics, rather than a comparison of ensemble means. This design can separate a shift in the predictive distribution from a loss of ensemble calibration.
-
-A second experiment would correct the rollout itself. At +6, +12, +24, or +48 h, one predicted field is replaced by ERA5 and the forecast continues. A subsequent reduction in other-field errors identifies a removable transfer path; renewed error in the corrected field measures how quickly the model recreates the inconsistency. This is a retrospective oracle experiment, not an operational correction, because future ERA5 is unavailable at issue time.
-
-For climate-service and early-warning use, the audit is a failure-mode test rather than a new forecast score. It can expose brittle channel dependence before deployment, but it does not improve the forecast, attribute climate change, or validate a decision rule. Standard skill, calibration, uncertainty, and expert review remain necessary.
+The main limitations are 48 dates in 2024, two leads, no date-block intervals, and source arrays that were unavailable during paper assembly. The month-block bootstrap added to the repository must be run before submission. Further checks should measure additional error against ERA5, mask below-ground points, and compare the climatology patch with an anomaly from another date matched by season and UTC. The appendix specifies ensemble audits for GenCast, FuXi-S2S, and LaDCast and retrospective ERA5 replacement within a rollout. For climate services, this remains a failure-mode audit: it exposes brittle channels but does not itself improve skill or validate a user's decision.
 
 \section{Conclusion}
 
-Paired climatology replacement reveals two behaviors that aggregate forecast scores miss. Aurora and Pangu can reduce the direct trace of a corrupted field as the rollout proceeds, yet the same intervention can leave errors in other variables. The transfer is directional and architecture-dependent: both models show a roughly ninefold $Z850\!\to V850$ asymmetry, while their near-surface temperature responses evolve differently with lead time. Lower-tropospheric geopotential is the most influential field family in the reported cross-field and spatial diagnostics; the terrain-based explanation remains a testable hypothesis rather than a measured cause.
-
-The practical result is a reproducible procedure for tracing forecast error through a multivariate model. The $19\times19$ matrices identify source--target pairs, dose sweeps quantify the size of the response, and maps show where it accumulates. These outputs are sufficient to rank candidate field and latitude weights for retraining experiments. They are not sufficient to claim that the proposed weights improve skill. That claim requires matched training runs, uncertainty estimates, and the ensemble and in-rollout correction tests described above.
+Paired replacement reveals directed transfer hidden by aggregate scores. Aurora and Pangu attenuate the direct trace of some perturbations while leaving errors in other variables; both reproduce the strong $Z850\!\to V850$ direction. Lower-level geopotential has the broadest response, although the role of terrain still needs a control. Matrices, dose curves, and maps form a reproducible channel audit and nominate retraining experiments. Claims of improved skill require uncertainty intervals, orographic controls, and matched training runs.
 
 \clearpage
 \bibliographystyle{unsrt}
@@ -242,6 +205,21 @@ The repository contains several evaluation sets. Its ERA5 cache and broad foreca
 
 Every matrix uses rows for patched inputs and columns for affected outputs. $S_{vu}\geq0$ measures displacement from the unpatched forecast after normalization by the verified field scale. A large diagonal entry means that the model cannot reconstruct that input from the other 18 fields; an off-diagonal entry records propagation into another output. $\Delta\acc_{vu}<0$ means that the same intervention reduces anomaly skill against ERA5. Color limits differ by model, lead, and metric. Cross-panel comparisons therefore use the cell values, not hue.
 
+\subsection{Statistical checks before submission}
+\label{app:statistics}
+
+The resampling unit is the initialization date, not a matrix cell. Cells share input states and are not independent observations. The added \texttt{analysis/bootstrap\_19var.py} script groups the four dates in each calendar month, resamples the 12 month blocks with replacement, and applies the same sample to Aurora and Pangu. Each of 5000 replicates recomputes the mean matrices. The outputs are 95\% intervals for every cell, the difference $S_{Z850,V850}-S_{V850,Z850}$, the diagonal ratio $S_{Z500,Z500}(24)/S_{Z500,Z500}(6)$, and the area-weighted cross-model correlation.
+
+The current figures contain point estimates. An earlier comparison script reported $r=0.913$ from unweighted \texttt{rel\_sens}, whereas the paper displays \texttt{rel\_sens\_w}. The script now defaults to area-weighted metrics, and the cross-model correlation is withheld until the source tables are rerun. The generated \texttt{weighted\_matrix\_ci.csv} and \texttt{key\_results\_bootstrap.csv} should be the sole numerical source for the final manuscript.
+
+Attenuation in $S$ measures return toward the baseline trajectory. A claim of correction against truth additionally requires
+\begin{equation}
+D_u^{(v)}(\tau)=\rmse_w(\hat y_u^{(v)}(\tau),y_u(\tau))-\rmse_w(\hat y_u^{(0)}(\tau),y_u(\tau)).
+\end{equation}
+A decline in $D_v^{(v)}$ across leads together with positive $D_u^{(v)}$ for $u\ne v$ would demonstrate recovery of the patched field and transfer to its neighbors. This test should use at least three leads; the stored +6 and +24 h results provide only two points.
+
+Two controls separate model structure from patch construction. For lower pressure levels, grid cells where surface pressure is below 1000 or 850 hPa should be excluded, with lowlands and high terrain reported separately. To test distribution shift, the climatology patch should be replaced by an anomaly from another date matched by season and UTC, optionally scaled to the same perturbation norm. The main pattern is stable only if the asymmetry sign, leading inputs, and matrix ranks persist.
+
 \subsection{Nineteen-field error-transfer matrices}
 \label{app:fullmatrices}
 
@@ -255,13 +233,15 @@ Every matrix uses rows for patched inputs and columns for affected outputs. $S_{
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{../../figures/patching_matrices/matrix_19var_pangu_n48_weighted.png}
-\caption{Pangu-Weather error-transfer matrices over the same 48 dates. Panel order and metrics match Fig.~\ref{fig:app-aurora-matrix}. At +6 h, $Z850\!\to V850=0.47$ and the reverse entry is $0.05$; MSLP and $Z500$ diagonal sensitivities are $0.53$ and $0.19$. The recurring directionality explains the high cross-model off-diagonal correlation ($r=0.913$), while the larger Pangu diagonal values show that agreement in structure does not imply equal magnitude.}
+\caption{Pangu-Weather error-transfer matrices over the same 48 dates. Panel order and metrics match Fig.~\ref{fig:app-aurora-matrix}. At +6 h, $Z850\!\to V850=0.47$ and the reverse entry is $0.05$; MSLP and $Z500$ diagonal sensitivities are $0.53$ and $0.19$. Leading directions recur across models, while the larger Pangu diagonal values show that similar structure does not imply equal magnitude.}
 \label{fig:app-pangu-matrix}
 \end{figure}
 
 The strongest shared pattern is directional coupling from mass fields into wind. Rows associated with $Z850$ and $Z500$ affect several wind outputs, whereas patching wind usually produces a smaller response in geopotential. The lower panels answer a different question: whether forecast displacement also degrades verification. Most entries are negative, but their magnitude is not proportional to $S$ because a displaced forecast can retain spatial anomaly correlation.
 
 \subsection{Aurora seven-field audit, 2024--2025}
+
+This check tests only whether the ordering of selected effects persists over time. It uses a different field set and unweighted spatial statistics, so its values cannot be pooled with the main sample or treated as an independent Pangu replication. Its useful evidence is the persistent low $Z500$ diagonal and $Z850\!\to V850$ direction across dates from two years.
 
 \begin{figure}[p]
 \centering
@@ -272,6 +252,8 @@ The strongest shared pattern is directional coupling from mass fields into wind.
 
 \subsection{Candidate field and latitude weights}
 \label{app:training}
+
+Each input yields three summaries: retained diagonal response $R_M$, total off-diagonal influence $I_M$, and latitude profile $E_{MN}(\phi)$. The first separates fields that the model partly reconstructs; the second identifies sources of broad transfer; the third shows where a common $\cos\phi$ weight misses output-specific error structure. These quantities must be normalized and fixed before training. New weights require a matched comparison with identical data, optimization budget, and initialization seeds.
 
 \begin{figure}[p]
 \centering
@@ -305,11 +287,13 @@ The strongest shared pattern is directional coupling from mass fields into wind.
 \subsection{Ensemble audit and mid-rollout field correction}
 \label{app:future}
 
-The paired audit should be extended to probabilistic systems with shared random seeds between baseline and patched members. GenCast samples diffusion-based 15-day ensembles~\citep{price2025gencast}; FuXi-S2S generates 42-day ensembles through learned and initial-condition perturbations~\citep{chen2024fuxis2s}; LaDCast generates hourly ensemble forecasts with a transformer-based diffusion model operating in a learned latent space~\citep{zhuang2025ladcast}. The report should include the distributions of $S$ and $\Delta\acc$, change in CRPS, and spread--skill behavior, not only the ensemble mean.
+The paired audit should be extended to probabilistic systems with shared random seeds between baseline and patched members. GenCast samples diffusion-based 15-day ensembles~\citep{price2025gencast}; FuXi-S2S generates 42-day ensembles through learned and initial-condition perturbations~\citep{chen2024fuxis2s}; LaDCast generates hourly ensemble forecasts with a transformer-based diffusion model operating in a learned latent space~\citep{zhuang2025ladcast}. An ensemble-mean comparison is insufficient; the report should include distributions of $S$ and $\Delta\acc$, change in CRPS, and spread--skill behavior.
 
 A second experiment should replace one predicted field with verifying ERA5 at +6, +12, +24, or +48 h and continue the rollout. Reduced downstream error would locate a correctable transfer pathway; renewed error in the replaced field would measure recurrence. This ground-truth intervention is a retrospective oracle test, not an operational forecast procedure. Running the same replacement for each field and lead would separate errors that the model damps, errors that recur, and errors that contaminate neighboring fields.
 
 \subsection{\texorpdfstring{$Z1000$}{Z1000} dose response}
+
+The dose panels show mean normalized error at six measured values of $\alpha$ and a least-squares slope through those points. The intercept includes baseline forecast error, and the slope describes the finite path to climatology. Without sweeps over other inputs, it is not a general law that $X\%$ noise in any field produces $Y\%$ error in another. The opposing lead-time changes in Aurora and Pangu instead show why the coefficient must remain model-specific.
 
 \begin{figure}[p]
 \centering
@@ -340,6 +324,8 @@ A second experiment should replace one predicted field with verifying ERA5 at +6
 \end{figure}
 
 \subsection{Verified skill rows and spatial composites}
+
+The $\Delta\acc$ rows test whether forecast displacement also reduces anomaly skill. Spatial composites show where added temporal RMSE occurs; they are not signed bias maps. The fractions of degraded cells and RMSE ratios below are unweighted grid-cell summaries and must be distinguished from the area-weighted global metrics used in the matrices.
 
 \begin{figure}[p]
 \centering

@@ -126,8 +126,12 @@ def process_file(fp):
                 base = d[f'baseline_lead{lead}_{out}']
                 acc_base, acc_base_w = acc(base, tr, cl), acc_w(base, tr, cl)
                 sd, sd_w = float(np.std(tr)), std_w(tr)
+                anom_sd_w = std_w(tr - cl)
+                rmse_base_w = rmse_w(base, tr)
                 for pat in NAMES:
                     p_ = d[f'patch{pat}_lead{lead}_{out}']
+                    rmse_patch_w = rmse_w(p_, tr)
+                    delta_rmse_w = rmse_patch_w - rmse_base_w
                     out_rows.append({
                         'date': label, 'lead': lead, 'patched': pat, 'output': out,
                         'rel_sens': rmse(p_, base) / sd if sd > 1e-9 else np.nan,
@@ -135,6 +139,12 @@ def process_file(fp):
                         'rel_sens_w': rmse_w(p_, base) / sd_w if sd_w > 1e-9 else np.nan,
                         'dacc_w': acc_w(p_, tr, cl) - acc_base_w,
                         'acc_base_w': acc_base_w,
+                        'rmse_base_w': rmse_base_w,
+                        'rmse_patch_w': rmse_patch_w,
+                        'delta_rmse_w': delta_rmse_w,
+                        'delta_rmse_w_anom': (
+                            delta_rmse_w / anom_sd_w if anom_sd_w > 1e-9 else np.nan
+                        ),
                     })
         d.close()
         return label, out_rows, None
