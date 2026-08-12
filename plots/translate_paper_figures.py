@@ -251,11 +251,13 @@ def translate_bias(model: str, lead: int) -> Path:
     # Tick-label widths move the source labels between panels.  Detect each
     # source label before repainting it so that no Russian fragments remain and
     # no tick value is erased.  The translation itself has no opaque backing.
+    # Both columns use the same 105 px gap from the right edge of the bar.
+    # This makes all four labels share a vertical guide in their own panels.
     label_specs = (
-        ((980, 330, 1180, 570), (1120, 450), "Delta RMSE, kg/kg"),
-        ((2160, 330, 2370, 570), (2260, 450), "Delta RMSE, K"),
-        ((980, 1000, 1180, 1240), (1120, 1120), "Delta RMSE, m/s"),
-        ((2160, 1000, 2370, 1240), (2260, 1120), "Delta RMSE, m/s"),
+        ((980, 330, 1180, 570), (1096, 450), "Delta RMSE, kg/kg"),
+        ((2160, 330, 2370, 570), (2270, 450), "Delta RMSE, K"),
+        ((980, 1000, 1180, 1240), (1096, 1120), "Delta RMSE, m/s"),
+        ((2160, 1000, 2370, 1240), (2270, 1120), "Delta RMSE, m/s"),
     )
     labels = [
         (find_vertical_label_box(image, search), xy, label)

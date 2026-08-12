@@ -54,40 +54,46 @@ ERA5 provides initial states and verification truth~\citep{hersbach2020era5}; We
 \centering
 \resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
-  every node/.style={font=\scriptsize,align=center,inner sep=4pt},
-  source/.style={draw=inkblue,rounded corners=2.5pt,fill=datablue,minimum width=2.35cm,minimum height=0.82cm,line width=0.65pt},
-  clim/.style={draw=warmline,rounded corners=2.5pt,fill=climorange,minimum width=2.35cm,minimum height=0.82cm,line width=0.65pt},
-  patch/.style={draw=warmline,rounded corners=2.5pt,fill=white,minimum width=3.10cm,minimum height=1.02cm,line width=0.75pt},
-  model/.style={draw=green!45!black,rounded corners=2.5pt,fill=modelgreen,minimum width=2.25cm,minimum height=0.86cm,line width=0.65pt},
-  forecast/.style={draw=violet!55!black,rounded corners=2.5pt,fill=resultpurple,minimum width=2.20cm,minimum height=0.86cm,line width=0.65pt},
-  metric/.style={draw=inkblue,rounded corners=2.5pt,fill=metricblue,minimum width=2.65cm,minimum height=1.02cm,line width=0.75pt},
-  result/.style={draw=violet!55!black,rounded corners=2.5pt,fill=resultpurple,minimum width=2.70cm,minimum height=1.02cm,line width=0.75pt},
-  flow/.style={-{Latex[length=2.2mm,width=1.45mm]},draw=black!65,line width=0.75pt,rounded corners=3pt},
+  every node/.style={font=\scriptsize,align=center},
+  box/.style={rounded corners=3pt,minimum height=0.90cm,inner sep=5pt,line width=0.7pt},
+  source/.style={box,draw=inkblue,fill=datablue,minimum width=2.30cm},
+  patch/.style={box,draw=warmline,fill=climorange,minimum width=3.10cm},
+  model/.style={box,draw=green!45!black,fill=modelgreen,minimum width=2.25cm},
+  forecast/.style={box,draw=violet!55!black,fill=resultpurple,minimum width=2.15cm},
+  compare/.style={circle,draw=black!55,fill=white,minimum size=1.05cm,inner sep=2pt,line width=0.7pt,font=\tiny},
+  metric/.style={box,draw=inkblue,fill=metricblue,minimum width=2.85cm},
+  result/.style={box,draw=violet!55!black,fill=resultpurple,minimum width=3.15cm},
+  flow/.style={-{Latex[length=2.3mm,width=1.5mm]},draw=black!65,line width=0.8pt},
   patchflow/.style={flow,draw=warmline},
-  lane/.style={font=\tiny\bfseries,anchor=west,inner sep=0pt}
+  guide/.style={font=\tiny\bfseries,anchor=west,inner sep=0pt}
 ]
-  \node[lane,text=inkblue] at (-1.15,1.72) {BASELINE};
-  \node[lane,text=warmline] at (-1.15,-0.48) {INTERVENTION};
-  \node[source] (x) at (0,1.08) {ERA5 state $\mathbf{x}(t)$\\19 fields};
-  \node[clim] (c) at (-0.10,-1.18) {WB2 climatology $\mathbf{c}(d,h)$\\season + UTC hour};
-  \node[model] (mb) at (6.15,1.08) {frozen $f_\theta$\\baseline rollout};
-  \node[patch] (p) at (3.35,-1.18) {$x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\$x_{j\ne v}^{(\alpha)}=x_j$};
-  \node[model] (mp) at (6.15,-1.18) {same $f_\theta$\\patched rollout};
-  \node[forecast] (yb) at (8.70,1.08) {$\hat y_u^{(0)}$\\+6 h, +24 h};
-  \node[forecast] (yp) at (8.70,-1.18) {$\hat y_u^{(v,\alpha)}$\\+6 h, +24 h};
-  \node[metric] (m) at (11.65,0) {$S_{vu}$ and $\Delta\acc_{vu}$\\area-weighted; ERA5 truth};
-  \node[result] (r) at (14.95,0) {directed $19\!\times\!19$ matrices\\dose curves; bias maps};
+  \node[guide,text=inkblue] at (-1.20,1.92) {REFERENCE};
+  \node[guide,text=warmline] at (-1.20,-0.40) {CONTROLLED PATCH};
+  \node[source] (x) at (0,1.30) {ERA5 state $\mathbf{x}(t)$\\19 fields};
+  \node[patch] (p) at (2.85,-1.08) {one field $v$ only\\$x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\$\alpha=0,.2,\ldots,1$};
+  \node[source] (c) at (-0.05,-1.08) {WB2 climatology $c_v(d,h)$\\same season and UTC};
+  \node[model] (mb) at (5.65,1.30) {frozen $f_\theta$\\reference rollout};
+  \node[model] (mp) at (5.65,-1.08) {same $f_\theta$\\patched rollout};
+  \node[forecast] (yb) at (8.15,1.30) {$\hat y_u^{(0)}$\\+6 h, +24 h};
+  \node[forecast] (yp) at (8.15,-1.08) {$\hat y_u^{(v,\alpha)}$\\+6 h, +24 h};
+  \node[compare] (cmp) at (10.15,0.10) {paired\\comparison};
+  \node[metric] (s) at (12.25,1.30) {forecast displacement\\$S_{vu}$: patched vs. reference};
+  \node[metric] (a) at (12.25,-1.08) {verified skill change\\$\Delta\acc_{vu}$: patched minus reference};
+  \node[result] (r) at (15.75,0.10) {directed $19\!\times\!19$ transfer\\dose-response curves\\spatial and latitude profiles};
   \draw[flow] (x.east) -- (mb.west);
-  \draw[flow] (mb.east) -- (yb.west);
-  \draw[patchflow] (x.south east) to[out=-65,in=125] (p.north west);
+  \draw[patchflow] (x.south east) to[out=-55,in=115] (p.north west);
   \draw[patchflow] (c.east) -- (p.west);
+  \draw[flow] (mb.east) -- (yb.west);
   \draw[patchflow] (p.east) -- (mp.west);
   \draw[patchflow] (mp.east) -- (yp.west);
-  \draw[flow] (yb.east) -- ([yshift=0.27cm]m.west);
-  \draw[patchflow] (yp.east) -- ([yshift=-0.27cm]m.west);
-  \draw[flow] (m.east) -- (r.west);
+  \draw[flow] (yb.east) to[out=0,in=150] (cmp.north west);
+  \draw[patchflow] (yp.east) to[out=0,in=210] (cmp.south west);
+  \draw[flow] (cmp.north east) to[out=30,in=180] (s.west);
+  \draw[flow] (cmp.south east) to[out=-30,in=180] (a.west);
+  \draw[flow] (s.east) to[out=0,in=155] (r.north west);
+  \draw[flow] (a.east) to[out=0,in=205] (r.south west);
 \end{tikzpicture}}
-\caption{Paired audit of one field. The date, model, and other 18 fields stay fixed. Full replacement supplies a matrix entry; six values of $\alpha$ trace the dose response.}
+\caption{Paired intervention audit. One input field is mixed with matched climatology while the date, model weights, and other 18 fields remain fixed. Comparing both rollouts separates displacement from the baseline forecast, $S$, from verified anomaly-skill change, $\Delta\acc$. Repeating the intervention over input-output pairs, doses, and grid cells produces directed matrices, dose curves, and spatial profiles.}
 \label{fig:method}
 \end{figure}
 
