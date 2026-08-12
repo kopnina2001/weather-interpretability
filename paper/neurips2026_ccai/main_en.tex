@@ -52,51 +52,7 @@ ERA5 provides initial states and verification truth~\citep{hersbach2020era5}; We
 
 \begin{figure}[t]
 \centering
-\resizebox{\linewidth}{!}{%
-\begin{tikzpicture}[
-  every node/.style={font=\scriptsize,align=center},
-  stage/.style={rounded corners=4pt,minimum height=3.35cm,inner xsep=8pt,
-    inner ysep=7pt,line width=0.85pt},
-  intervention/.style={stage,draw=warmline,fill=climorange,text width=3.45cm},
-  rollouts/.style={stage,draw=green!45!black,fill=modelgreen,text width=4.10cm},
-  readouts/.style={stage,draw=inkblue,fill=metricblue,text width=3.45cm},
-  evidence/.style={stage,draw=violet!55!black,fill=resultpurple,text width=3.35cm},
-  flow/.style={-{Stealth[length=2.4mm,width=1.65mm]},draw=inkblue!80,
-    line width=0.95pt,shorten <=1pt,shorten >=1pt}
-]
-  \node[intervention] (input) at (0,0) {%
-    {\sffamily\bfseries\color{warmline}1\quad CONTROLLED INPUT}\\[6pt]
-    choose one of 19 fields $v$\\[2pt]
-    $x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\[2pt]
-    $c_v$: day--UTC-matched climatology\\
-    $\alpha=0,.2,\ldots,1$; other 18 fields fixed};
-
-  \node[rollouts,right=8mm of input] (roll) {%
-    {\sffamily\bfseries\color{green!38!black}2\quad PAIRED ROLLOUTS}\\[7pt]
-    $\mathbf{x}(t)\ \xrightarrow{\quad f_\theta\quad}\ \hat{\mathbf y}^{(0)}(t+\tau)$\\[7pt]
-    $\mathbf{x}^{(v,\alpha)}(t)\ \xrightarrow{\ \mathrm{same}\ f_\theta\ }\
-      \ \hat{\mathbf y}^{(v,\alpha)}(t+\tau)$\\[6pt]
-    frozen weights; same date and lead $\tau$};
-
-  \node[readouts,right=8mm of roll] (measure) {%
-    {\sffamily\bfseries\color{inkblue}3\quad TWO READOUTS}\\[7pt]
-    $S_{vu}$\\[-1pt]
-    forecast displacement\\[6pt]
-    $\Delta\acc_{vu}$\\[-1pt]
-    ERA5-verified anomaly-skill change\\[5pt]
-    area weighted; $\tau=6,24$ h};
-
-  \node[evidence,right=8mm of measure] (output) {%
-    {\sffamily\bfseries\color{violet!60!black}4\quad AGGREGATE}\\[7pt]
-    directed $19\!\times\!19$ matrices\\[4pt]
-    dose--response curves\\[4pt]
-    spatial error maps\\[4pt]
-    field-specific latitude profiles};
-
-  \draw[flow] (input.east) -- (roll.west);
-  \draw[flow] (roll.east) -- (measure.west);
-  \draw[flow] (measure.east) -- (output.west);
-\end{tikzpicture}}
+\includegraphics[width=\linewidth]{figures/method_pipeline_en.pdf}
 \caption{Paired intervention audit. A season- and UTC-matched perturbation is passed through the same frozen model as the reference state. The paired forecasts yield two distinct readouts: displacement from the reference rollout, $S$, and verified anomaly-skill change, $\Delta\acc$. Repeating the audit over input--output pairs and perturbation doses produces directed matrices and spatial summaries.}
 \label{fig:method}
 \end{figure}

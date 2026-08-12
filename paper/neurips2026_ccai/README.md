@@ -17,12 +17,17 @@ references start on page 5 and the supplementary material follows them.
 From this directory:
 
 ```bash
+rsvg-convert -f pdf -o figures/method_pipeline_en.pdf figures/method_pipeline_en.svg
+rsvg-convert -f pdf -o figures/method_pipeline_ru.pdf figures/method_pipeline_ru.svg
 latexmk -pdf -interaction=nonstopmode -halt-on-error -outdir=build/en main_en.tex
 latexmk -xelatex -interaction=nonstopmode -halt-on-error -outdir=build/ru main_ru.tex
 ```
 
 The English version uses pdfLaTeX as requested by the template. The Russian
 mirror uses XeLaTeX so Cyrillic glyphs remain embedded and searchable.
+Figure 1 is maintained as bilingual SVG source and converted to vector PDF with
+`rsvg-convert`; its arrow ports and routes are fixed rather than automatically
+re-laid out during the LaTeX build.
 
 Final checked PDFs are copied to:
 
