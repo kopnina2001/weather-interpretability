@@ -66,25 +66,28 @@ ERA5 provides initial states and verification truth~\citep{hersbach2020era5}; We
   patchflow/.style={flow,draw=warmline},
   lane/.style={font=\tiny\bfseries,anchor=west,inner sep=0pt}
 ]
-  \node[lane,text=inkblue] at (-1.15,1.72) {BASELINE};
-  \node[lane,text=warmline] at (-1.15,-0.48) {INTERVENTION};
-  \node[source] (x) at (0,1.08) {ERA5 state $\mathbf{x}(t)$\\19 fields};
-  \node[clim] (c) at (0,-1.18) {WB2 climatology $\mathbf{c}(d,h)$\\season + UTC hour};
-  \node[model] (mb) at (5.90,1.08) {frozen $f_\theta$\\baseline rollout};
-  \node[patch] (p) at (3.05,-1.18) {$x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\$x_{j\ne v}^{(\alpha)}=x_j$};
-  \node[model] (mp) at (5.90,-1.18) {same $f_\theta$\\patched rollout};
-  \node[forecast] (yb) at (8.45,1.08) {$\hat y_u^{(0)}$\\+6 h, +24 h};
-  \node[forecast] (yp) at (8.45,-1.18) {$\hat y_u^{(v,\alpha)}$\\+6 h, +24 h};
-  \node[metric] (m) at (11.40,0) {$S_{vu}$ and $\Delta\acc_{vu}$\\area-weighted; ERA5 truth};
-  \node[result] (r) at (14.70,0) {directed $19\!\times\!19$ matrices\\dose curves; error maps};
+  % Relative placement preserves gaps when formula width changes.
+  \node[source] (x) at (0,1.15) {ERA5 state $\mathbf{x}(t)$\\19 fields};
+  \node[clim] (c) at (0,-1.15) {WB2 climatology $\mathbf{c}(d,h)$\\season + UTC hour};
+  \node[patch,right=0.62cm of c] (p) {$x_v^{(\alpha)}=(1-\alpha)x_v+\alpha c_v$\\$x_{j\ne v}^{(\alpha)}=x_j$};
+  \node[model,right=0.62cm of p] (mp) {same $f_\theta$\\patched rollout};
+  \node[forecast,right=0.58cm of mp] (yp) {$\hat y_u^{(v,\alpha)}$\\+6 h, +24 h};
+  \node[model] (mb) at (mp |- x) {frozen $f_\theta$\\baseline rollout};
+  \node[forecast] (yb) at (yp |- x) {$\hat y_u^{(0)}$\\+6 h, +24 h};
+  \coordinate (join) at ($(yb.east)!0.5!(yp.east)$);
+  \node[metric,anchor=west] (m) at ([xshift=0.85cm]join) {$S_{vu}$ and $\Delta\acc_{vu}$\\area-weighted; ERA5 truth};
+  \node[result,anchor=west] (r) at ([xshift=0.62cm]m.east) {directed $19\!\times\!19$ matrices\\dose curves; error maps};
+  \node[lane,text=inkblue,anchor=south west] at ([yshift=0.14cm]x.north west) {BASELINE};
+  \node[lane,text=warmline,anchor=south west] at ([yshift=0.14cm]c.north west) {INTERVENTION};
   \draw[flow] (x.east) -- (mb.west);
   \draw[flow] (mb.east) -- (yb.west);
-  \draw[patchflow] (x.south) -- ++(0,-0.43) -| (p.north);
+  \draw[patchflow] (x.south) -- ++(0,-0.52) -| (p.north);
   \draw[patchflow] (c.east) -- (p.west);
   \draw[patchflow] (p.east) -- (mp.west);
   \draw[patchflow] (mp.east) -- (yp.west);
-  \draw[flow] (yb.east) -- (m.north west);
-  \draw[patchflow] (yp.east) -- (m.south west);
+  % Route paired forecasts to separate metric ports.
+  \draw[flow] (yb.east) -- ++(0.32,0) |- ([yshift=0.26cm]m.west);
+  \draw[patchflow] (yp.east) -- ++(0.32,0) |- ([yshift=-0.26cm]m.west);
   \draw[flow] (m.east) -- (r.west);
 \end{tikzpicture}}
 \caption{Paired intervention audit. A season- and UTC-matched perturbation is passed through the same frozen model as the reference state. The paired forecasts yield two distinct readouts: displacement from the reference rollout, $S$, and verified anomaly-skill change, $\Delta\acc$. Repeating the audit over input--output pairs and perturbation doses produces directed matrices and spatial summaries.}
@@ -99,6 +102,8 @@ S_{vu}(\tau)&=\frac{1}{|\mathcal D|}\sum_{t\in\mathcal D}
 \left[\acc_w(\hat y_u^{(v)},y_u,c_u)-\acc_w(\hat y_u^{(0)},y_u,c_u)\right].
 \end{align}
 Spatial sums use normalized $\cos\phi$ weights. $S$ measures distance from the baseline forecast; negative $\Delta\acc$ records a loss of anomaly skill against ERA5. For the dose sweep, $Z1000$ is mixed with climatology at $\alpha\in\{0,.2,.4,.6,.8,1\}$; spatial composites compute temporal RMSE at each grid cell. The patch retains season and UTC hour but creates an inconsistent multivariate state. Thus $\alpha=1$ is a finite stress test, not a local gradient or evidence of atmospheric causality.
+
+The two metrics separate model sensitivity from verified skill. Large $S_{vu}$ with small $|\Delta\acc_{vu}|$ means that output $u$ moved substantially while retaining its spatial anomaly pattern against ERA5. Small $S_{vu}$ does not establish that input $v$ is unimportant: the model may reconstruct it from the remaining channels. We therefore read a diagonal entry together with the rest of its input row rather than treating self-response and cross-field transfer as separate experiments.
 
 \section{Results}
 
@@ -121,6 +126,8 @@ Spatial sums use normalized $\cos\phi$ weights. $S$ measures distance from the b
 \subsection{Direction and attenuation}
 
 The matrices are asymmetric. At +6 h, $S_{Z850,V850}$ is $0.38$ for Aurora and $0.47$ for Pangu, while the reverse entries are $0.04$ and $0.05$. The roughly ninefold contrast recurs in both architectures. Diagonal $S_{Z500,Z500}$ falls from $0.08$ to $0.04$ in Aurora and from $0.19$ to $0.09$ in Pangu between +6 and +24 h. This is a return toward the baseline trajectory, not demonstrated improvement against ERA5: off-diagonal errors remain.
+
+This combination is consistent with partial self-correction. After replacement, $Z500$ moves back toward the baseline forecast because the network can use consistent neighboring levels and variables. The recovery is not free: the perturbation has already entered wind and other outputs. The audit therefore distinguishes reconstruction of the patched channel from stability of the full multivariate state.
 
 \subsection{Dose and spatial footprint}
 
@@ -179,9 +186,17 @@ Lower-tropospheric geopotential gives the broadest response. $Z1000$ and $Z850$ 
 
 The matrix ranks outward field influence, the dose slope supplies a finite response coefficient, and latitude profiles locate the added error. These quantities can select $\lambda_N$ and field-specific $w_N(\phi)$ in $\mathcal L=\sum_N\lambda_N\sum_s w_N(\phi_s)\ell_N(s)$. This is a matched retraining plan, not a demonstrated gain.
 
+A practical protocol starts from the off-diagonal row sum, which identifies inputs whose errors spread most widely. $\Delta\acc$ then separates a large but harmless displacement from a loss of skill, and the maps locate latitude bands and regions where error accumulates. Loss weights are fixed only after these checks. Their evaluation must keep dates, compute budget, and initialization seeds matched and report every output field, so improvement in one channel cannot be bought by degrading the others.
+
+Self-correction can be tested directly by comparing patched and baseline error against ERA5. Define $D_u^{(v)}(\tau)=\rmse_w(\hat y_u^{(v)},y_u)-\rmse_w(\hat y_u^{(0)},y_u)$. A decline in $D_v^{(v)}$ over at least three leads would show recovery of the patched field; positive $D_u^{(v)}$ for $u\ne v$ would quantify the error transferred into its neighbors. This criterion is stricter than a falling diagonal of $S$, which shows only convergence toward the unpatched forecast.
+
+Uncertainty must be estimated over initialization dates. The repository resamples 12 month blocks, with the same draw for both models, to preserve within-date dependence among cells. Primary interval targets are the $Z850\!\to V850$ directional contrast, the $Z500$ attenuation ratio, and cross-model rank agreement.
+
 A smaller seven-field Aurora audit provides a temporal check on 48 dates spanning 2024--2025. It retains a low $Z500$ diagonal and the stronger $Z850\!\to V850$ direction, but its different field set and lack of Pangu forecasts prevent pooling it with the main matrix.
 
-The main limitations are 48 dates in 2024, two leads, no date-block intervals, and source arrays that were unavailable during paper assembly. The month-block bootstrap added to the repository must be run before submission. Further checks should measure additional error against ERA5, mask below-ground points, and compare the climatology patch with an anomaly from another date matched by season and UTC. The appendix specifies ensemble audits for GenCast, FuXi-S2S, and LaDCast and retrospective ERA5 replacement within a rollout. For climate services, this remains a failure-mode audit: it exposes brittle channels but does not itself improve skill or validate a user's decision.
+The main limitations are 48 dates in 2024, two leads, and no date-block intervals. Before submission, the bootstrap must be run, additional error against ERA5 measured, below-ground points masked, and the patch compared with an anomaly from another season- and UTC-matched date. The appendix specifies ensemble and mid-rollout oracle tests. The audit exposes brittle channels but does not itself improve skill.
+
+The climate pathway is reliability control for forecast components. An early-warning center could use the matrix to select fields that need stricter input checks, redundant observations, or separate calibration. Latitude maps show where a global score hides systematic error accumulation. These uses remain hypotheses until they are tested on events, regions, and decision metrics tied to a defined service user.
 
 \section{Conclusion}
 
