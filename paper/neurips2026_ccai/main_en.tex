@@ -29,7 +29,7 @@
 \newcommand{\rmse}{\operatorname{RMSE}}
 \newcommand{\acc}{\operatorname{ACC}}
 
-\title{Interpretability Methods for Transformer-Based Weather Forecasting Models}
+\title{Cross-Field Error Transfer in Transformer Weather Forecasts under Climatological Input Replacement}
 \author{Anonymous Author(s)}
 
 \begin{document}
@@ -124,15 +124,11 @@ The two metrics separate model sensitivity from verified skill. Large $S_{vu}$ w
 \label{fig:matrixoverview}
 \end{figure}
 
-\subsection{Direction and attenuation}
-
-The matrices are asymmetric. At +6 h, $S_{Z850,V850}$ is $0.38$ for Aurora and $0.47$ for Pangu, while the reverse entries are $0.04$ and $0.05$. The roughly ninefold contrast recurs in both architectures. Diagonal $S_{Z500,Z500}$ falls from $0.08$ to $0.04$ in Aurora and from $0.19$ to $0.09$ in Pangu between +6 and +24 h. This attenuation shows motion toward the baseline trajectory. It does not by itself establish lower error against ERA5, and off-diagonal responses persist.
+\paragraph{Direction and attenuation.} The matrices are asymmetric. At +6 h, $S_{Z850,V850}$ is $0.38$ for Aurora and $0.47$ for Pangu, while the reverse entries are $0.04$ and $0.05$. The roughly ninefold contrast recurs in both architectures. Diagonal $S_{Z500,Z500}$ falls from $0.08$ to $0.04$ in Aurora and from $0.19$ to $0.09$ in Pangu between +6 and +24 h. This attenuation shows motion toward the baseline trajectory. It does not by itself establish lower error against ERA5, and off-diagonal responses persist.
 
 The pattern is consistent with partial self-correction of $Z500$ from neighboring levels and variables. By the time $Z500$ approaches the baseline forecast, the intervention has already changed wind and other outputs. The audit separates reconstruction of the replaced channel from stability of the full multivariate state.
 
-\subsection{Dose and spatial footprint}
-
-All six $Z1000$ doses rise without a plateau. The $T1000$ response slope in Aurora falls from $0.690$ to $0.217$ between +6 and +24 h, while Pangu rises from $0.406$ to $0.614$. Damping therefore depends on the model and lead. After full replacement, mean per-cell $T1000$ RMSE increases by $6.02/2.01\times$ in Aurora and $3.35/3.06\times$ in Pangu at +6/+24 h. The increase covers 99--100\% of cells, with different latitude profiles across models.
+\paragraph{Dose and spatial footprint.} All six $Z1000$ doses rise without a plateau. The $T1000$ response slope in Aurora falls from $0.690$ to $0.217$ between +6 and +24 h, while Pangu rises from $0.406$ to $0.614$. Damping therefore depends on the model and lead. After full replacement, mean per-cell $T1000$ RMSE increases by $6.02/2.01\times$ in Aurora and $3.35/3.06\times$ in Pangu at +6/+24 h. The increase covers 99--100\% of cells, with different latitude profiles across models.
 
 \begin{figure}[t]
 \centering

@@ -319,7 +319,9 @@ def translate_acc_strip() -> Path:
         (1120, 1265, "Pangu-Weather  +24 h   (n=48 dates)"),
     )
     for x, y, text in titles:
-        blank(draw, (650, y - 22, 1590, y + 21))
+        # The original title glyphs occupy about 18 px.  Keep the replacement
+        # box clear of the heatmap border immediately below each title.
+        blank(draw, (650, y - 15, 1590, y + 15))
         centered(draw, (x, y), text, FONT(23))
 
     blank(draw, (0, 180, 49, 1525))
