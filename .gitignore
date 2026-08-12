@@ -6,3 +6,16 @@ __pycache__/
 model_weights/
 results/
 logs/
+tmp/
+TCCML_NeurIPS_2026_Style_File.zip
+paper/neurips2026_ccai/*.aux
+paper/neurips2026_ccai/*.bbl
+paper/neurips2026_ccai/*.blg
+paper/neurips2026_ccai/*.fdb_latexmk
+paper/neurips2026_ccai/*.fls
+paper/neurips2026_ccai/*.log
+paper/neurips2026_ccai/*.out
+paper/neurips2026_ccai/*.pdf
+paper/neurips2026_ccai/*.xdv
+output/anonymous_repository/weather-forecast-response-audit-anonymous/
+output/pdf/weather_interpretability_ccai2026_*.pdf

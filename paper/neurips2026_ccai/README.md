@@ -34,8 +34,8 @@ Final checked PDFs are copied to:
 ## Evidence status
 
 The committed code, README, and rendered figures were checked together. The
-`data` and `results` symlinks point to `/srv/exw` and were unavailable on the
-authoring host, so raw arrays and confidence intervals were not recomputed.
+`data` and `results` symlinks point to an external run store and were unavailable
+on the authoring host, so raw arrays and confidence intervals were not recomputed.
 The manuscript says this explicitly and treats reported values as descriptive
 point estimates.
 
@@ -67,3 +67,13 @@ All figures referenced by `main_en.tex` have English labels. The deterministic
 and the dedicated bilingual `T1000` panels used in Figure 3 without changing
 any numerical panel or map; the Russian source figures remain available to
 `main_ru.tex`.
+
+## Anonymous supplementary repository
+
+Run `python tools/build_anonymous_repository.py`. The script copies only the
+paper, the analysis and plotting code needed to inspect the reported method,
+and the figures used by the manuscripts. It excludes Git history, legacy
+experiments, local symlinks, generated LaTeX files, and host-specific paths.
+It then scans text and archive member names for identity and absolute-path
+markers and writes the result to `output/anonymous_repository/` together with a
+ZIP archive and `SHA256SUMS`.

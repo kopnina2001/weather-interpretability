@@ -117,8 +117,8 @@ def main() -> None:
                 pairs, key=lambda row: -(row[2] - row[3])
             )[:6]:
                 print(
-                    f"   {source}->{target} = {forward:.3f}  vs  "
-                    f"{target}->{source} = {reverse:.3f}   "
+                    f"   response of {target} to replaced {source} = {forward:.3f}; "
+                    f"reverse response = {reverse:.3f}   "
                     f"({forward / max(reverse, 1e-6):.1f}x)"
                 )
 
