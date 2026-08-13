@@ -61,8 +61,8 @@ FORBIDDEN_PATTERNS = {
 README = """# Anonymous supplementary repository
 
 This package accompanies the anonymous workshop submission
-"Cross-Field Forecast Responses to Climatological Input Replacement in Aurora
-and Pangu-Weather."
+"Tracing Cross-Field Responses to Input Perturbations in Transformer-Based
+Weather Forecasting Models."
 
 ## Contents
 

@@ -77,3 +77,17 @@ experiments, local symlinks, generated LaTeX files, and host-specific paths.
 It then scans text and archive member names for identity and absolute-path
 markers and writes the result to `output/anonymous_repository/` together with a
 ZIP archive and `SHA256SUMS`.
+
+## OpenReview metadata
+
+**Title:** Tracing Cross-Field Responses to Input Perturbations in
+Transformer-Based Weather Forecasting Models
+
+**TL;DR:** Paired climatological replacement yields 19-by-19 response matrices
+in Aurora and Pangu-Weather, revealing shared directional asymmetries, partial
+$Z500$ reconstruction, and broad sensitivity to lower-level geopotential
+perturbations.
+
+**Keywords:** transformer-based weather forecasting; model interpretability;
+controlled input perturbations; cross-field responses; forecast verification;
+Aurora; Pangu-Weather; climate adaptation.
